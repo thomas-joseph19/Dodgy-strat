@@ -1,7 +1,11 @@
 import pandas as pd
 from typing import Optional
-from src.models import TradeSetup, Direction, StopType
-from src.simulator_models import TradeState, TradeResult
+from datetime import time
+from src.models import TradeSetup, Direction, StopType, SetupRegistry
+from src.simulator_models import (
+    TradeState, TradeResult, SimulationConfig, 
+    AccountState, calculate_trade_pnl, calculate_position_size
+)
 
 class ExecutionEngine:
     def evaluate_setup(self, setup: TradeSetup, ohlc_df: pd.DataFrame) -> TradeResult:
@@ -103,5 +107,29 @@ class ExecutionEngine:
                     setup, candle,
                     exit_price=setup.target_price
                 )
-        
         return None
+
+    def run_backtest(self, registry: SetupRegistry, df: pd.DataFrame, config: SimulationConfig) -> AccountState:
+        account = AccountState(config.starting_capital)
+        
+        # Sort pending and closed setups chronologically by creation time
+        setups = sorted(registry.pending + registry.closed, key=lambda s: s.created_at)
+        
+        rth_start = time(9, 30)
+        rth_end = time(16, 0)
+        
+        for setup in setups:
+            setup_time = setup.created_at.time()
+            if not (rth_start <= setup_time <= rth_end):
+                continue
+                
+            result = self.evaluate_setup(setup, df)
+            
+            if result.status == "closed":
+                contracts = calculate_position_size(setup, account.equity, config)
+                result.contracts = contracts
+                
+                net_pnl = calculate_trade_pnl(result, contracts, config)
+                account.apply_result(result, net_pnl)
+                
+        return account
