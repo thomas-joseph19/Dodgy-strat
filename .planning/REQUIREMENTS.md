@@ -58,32 +58,32 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DATA-01 | | Pending |
-| DATA-02 | | Pending |
-| CORE-01 | | Pending |
-| CORE-02 | | Pending |
-| CORE-03 | | Pending |
-| CORE-04 | | Pending |
-| CORE-05 | | Pending |
-| SIG-01 | | Pending |
-| SIG-02 | | Pending |
-| SIG-03 | | Pending |
-| SIG-04 | | Pending |
-| EXEC-01 | | Pending |
-| EXEC-02 | | Pending |
-| EXEC-03 | | Pending |
-| EXEC-04 | | Pending |
-| EXEC-05 | | Pending |
-| EXEC-06 | | Pending |
-| REP-01 | | Pending |
-| REP-02 | | Pending |
-| REP-03 | | Pending |
-| REP-04 | | Pending |
+| DATA-01 | Phase 1 | Pending |
+| DATA-02 | Phase 1 | Pending |
+| CORE-01 | Phase 2 | Pending |
+| CORE-02 | Phase 2 | Pending |
+| CORE-03 | Phase 2 | Pending |
+| CORE-04 | Phase 2 | Pending |
+| CORE-05 | Phase 2 | Pending |
+| SIG-01 | Phase 3 | Pending |
+| SIG-02 | Phase 3 | Pending |
+| SIG-03 | Phase 3 | Pending |
+| SIG-04 | Phase 3 | Pending |
+| EXEC-01 | Phase 4 | Pending |
+| EXEC-02 | Phase 4 | Pending |
+| EXEC-03 | Phase 4 | Pending |
+| EXEC-04 | Phase 4 | Pending |
+| EXEC-05 | Phase 4 | Pending |
+| EXEC-06 | Phase 4 | Pending |
+| REP-01 | Phase 5 | Pending |
+| REP-02 | Phase 5 | Pending |
+| REP-03 | Phase 5 | Pending |
+| REP-04 | Phase 5 | Pending |
 
 **Coverage:**
 - v1 requirements: 21 total
-- Mapped to phases: 0
-- Unmapped: 21 ⚠️
+- Mapped to phases: 21
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-04-02*
