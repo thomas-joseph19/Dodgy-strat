@@ -114,3 +114,21 @@ class StrategyLogic:
         df['active_bear_zone_bottom'] = active_bear_zone_bottoms
         
         return df
+
+    def detect_ifvgs(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Identify Inverted Fair Value Gaps (IFVGs).
+        Triggers when candle close crosses completely through an active stack zone.
+        """
+        df = df.copy()
+        
+        # Bullish IFVG (Bearish zone inverted upwards)
+        # Check that we HAD an active bear zone on the PREVIOUS bar, and the current close is above its top.
+        prev_bear_top = df['active_bear_zone_top'].shift(1)
+        df['ifvg_bull_trigger'] = (df['close'] > prev_bear_top) & (~prev_bear_top.isna())
+        
+        # Bearish IFVG (Bullish zone inverted downwards)
+        prev_bull_bottom = df['active_bull_zone_bottom'].shift(1)
+        df['ifvg_bear_trigger'] = (df['close'] < prev_bull_bottom) & (~prev_bull_bottom.isna())
+        
+        return df
