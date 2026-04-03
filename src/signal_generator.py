@@ -7,11 +7,14 @@ from src.models import (
     SignalGrade, SweepEvent, FVGZone
 )
 
-class SignalGenerator:
-    def __init__(self):
-        pass
+from src.config import StrategyConfig
 
-    def generate_signals(self, df: pd.DataFrame, registry: SetupRegistry):
+class SignalGenerator:
+    def __init__(self, config: StrategyConfig):
+        self.config = config
+
+    def generate_setups(self, df: pd.DataFrame) -> SetupRegistry:
+        registry = SetupRegistry()
         df = df.copy()
         
         active_sweep_long: Optional[SweepEvent] = None

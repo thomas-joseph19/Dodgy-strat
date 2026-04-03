@@ -26,6 +26,8 @@ class DataLoader:
                 df.rename(columns={'datetime': 'time'}, inplace=True)
             elif 'date' in df.columns and 'time' not in df.columns:
                 df.rename(columns={'date': 'time'}, inplace=True)
+            elif 'timestamp' in df.columns and 'time' not in df.columns:
+                df.rename(columns={'timestamp': 'time'}, inplace=True)
                 
             missing_cols = required_cols - set(df.columns)
             if missing_cols:

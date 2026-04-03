@@ -3,7 +3,7 @@ from typing import List, Dict
 import pandas as pd
 import numpy as np
 
-from src.models import TradeSetup, SetupRegistry, ModelType, SetupGrade
+from src.models import TradeSetup, SetupRegistry, ModelType, SignalGrade
 from src.simulator_models import TradeResult, AccountState, SimulationConfig
 
 @dataclass 
@@ -108,8 +108,8 @@ def calculate_metrics(registry: SetupRegistry, account: AccountState, start_date
 
     rev_wr = get_win_rate(lambda s: s.model_type == ModelType.REVERSAL)
     con_wr = get_win_rate(lambda s: s.model_type == ModelType.CONTINUATION)
-    mech_wr = get_win_rate(lambda s: s.grade == SetupGrade.MECHANICAL)
-    adv_wr = get_win_rate(lambda s: s.grade == SetupGrade.ADVANCED)
+    mech_wr = get_win_rate(lambda s: s.grade == SignalGrade.MECHANICAL)
+    adv_wr = get_win_rate(lambda s: s.grade == SignalGrade.ADVANCED)
     
     # R Realized (Approximate based on raw risk/reward vs exit diff. Realized RR is net_pnl / risk_amount)
     rr_realized_sum = []

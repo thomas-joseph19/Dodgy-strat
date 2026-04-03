@@ -1,10 +1,23 @@
 import pandas as pd
 import numpy as np
 
+from .config import StrategyConfig
+
 class StrategyLogic:
-    def __init__(self, pivot_lookback: int = 10, sweep_max_lookback: int = 20):
-        self.pivot_lookback = pivot_lookback
-        self.sweep_max_lookback = sweep_max_lookback
+    def __init__(self, config: StrategyConfig):
+        self.config = config
+        self.pivot_lookback = config.pivot_lookback
+        self.sweep_max_lookback = config.sweep_max_lookback
+
+    def enrich_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Runs the full enrichment pipeline sequentially.
+        """
+        df = self.detect_sweeps(df)
+        df = self.detect_fvgs(df)
+        df = self.detect_zones(df)
+        df = self.detect_ifvgs(df)
+        return df
 
     def detect_sweeps(self, df: pd.DataFrame) -> pd.DataFrame:
         """

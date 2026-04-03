@@ -85,6 +85,23 @@ def calculate_position_size(setup: TradeSetup, account_equity: float, config: Si
     
     return max(config.min_contracts, min(config.max_contracts, contracts))
 
+def calculate_trade_pnl(result: TradeResult, contracts: int, config: SimulationConfig) -> float:
+    slippage_per_side = config.slippage_ticks * config.tick_size
+    
+    if result.setup.direction == Direction.LONG:
+        actual_entry = result.raw_entry_price + slippage_per_side
+        actual_exit = result.raw_exit_price - slippage_per_side
+        points_gained = actual_exit - actual_entry
+    else:
+        actual_entry = result.raw_entry_price - slippage_per_side
+        actual_exit = result.raw_exit_price + slippage_per_side
+        points_gained = actual_entry - actual_exit
+        
+    gross_pnl = points_gained * config.point_value * contracts
+    commission = config.commission_per_rt * contracts
+    
+    return gross_pnl - commission
+
 class AccountState:
     def __init__(self, starting_capital: float = 100_000.00):
         self.equity = starting_capital
