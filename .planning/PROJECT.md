@@ -74,6 +74,7 @@ Phase 1 complete — Config management and Data Loader frameworks are establishe
 Phase 2 complete — Core strategy mechanics (Sweeps, FVGs, IFVG inversion triggers) are functioning over dataframe.
 Phase 3 complete — Signal Engine operates properly, generating structured TradeSetup outputs via Reversal and Continuation schemas.
 Phase 4 complete — Execution Engine robustly simulates setup chronologies dynamically scaling 1% risk P&L accurately adjusting for real-world friction.
+Phase 5 complete — Reporting suite renders institutional-grade Sharpe/Sortino metrics and interactive Plotly visuals for tick-level verification.
 
 ---
-*Last updated: 2026-04-02 after Phase 4 completion*
+*Last updated: 2026-04-02 after Phase 5 completion*

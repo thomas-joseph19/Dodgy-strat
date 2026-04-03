@@ -10,7 +10,7 @@
 | 2 | Core Mechanics | 3/3 | Complete    | 2026-04-03 |
 | 3 | Signal Engine | 3/3 | Complete    | 2026-04-03 |
 | 4 | Execution Simulator | 3/3 | Complete    | 2026-04-03 |
-| 5 | Reports & Visuals | Generate performance metrics, equity curves, and setup plots | REP-01, REP-02, REP-03, REP-04 | 3 |
+| 5 | Reports & Visuals | 3/3 | Complete    | 2026-04-03 |
 
 ### Phase Details
 
