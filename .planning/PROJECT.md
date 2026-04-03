@@ -15,4 +15,11 @@ A backtesting and signal generation engine for a price action/Smart Money Concep
 | Dynamic Position Sizing | Risk 1% of simulated $100k account per trade to reflect real performance. | Precise contract calculation. |
 
 ## Evolution
-This document evolves at phase transitions and milestone boundaries.
+- **v1.0 (Current)**: High-performance mechanical backtest engine with 1H HTF swept liquidity context.
+- **v2.0 (Planned)**: Machine Learning optimization for signal filtering and predictive setup grading.
+
+## Milestone V2: Machine Learning Optimization
+**Goal**: Implement a predictive layer that grades trade setups before entry to increase Win Rate and reduce drawdown.
+- **Features**: Quantitative price action structural features.
+- **Modeling**: XGBoost/Random Forest classification.
+- **Validation**: Walk-forward analysis and Monte Carlo stress testing.
