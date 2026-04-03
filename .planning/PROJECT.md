@@ -71,6 +71,7 @@ This document evolves at phase transitions and milestone boundaries.
 ## Current State
 
 Phase 1 complete — Config management and Data Loader frameworks are established.
+Phase 2 complete — Core strategy mechanics (Sweeps, FVGs, IFVG inversion triggers) are functioning over dataframe.
 
 ---
-*Last updated: 2026-04-02 after Phase 1 completion*
+*Last updated: 2026-04-02 after Phase 2 completion*

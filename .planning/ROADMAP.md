@@ -7,7 +7,7 @@
 | # | Phase | Goal | Requirements | Success Criteria |
 |---|-------|------|--------------|------------------|
 | 1 | Data & Framework | Set up project architecture and OHLCV data pipelines | Complete    | 2026-04-03 |
-| 2 | Core Mechanics | Algorithmically identify sweeps, FVGs, and Inversions | CORE-01, CORE-02, CORE-03, CORE-04, CORE-05 | 3 |
+| 2 | Core Mechanics | 3/3 | Complete    | 2026-04-03 |
 | 3 | Signal Engine | Mechanize full Reversal and Continuation models | SIG-01, SIG-02, SIG-03, SIG-04 | 2 |
 | 4 | Execution Simulator | Handle entry, RR profiling, dynamic stops, entries, and target exits | EXEC-01, EXEC-02, EXEC-03, EXEC-04, EXEC-05, EXEC-06 | 3 |
 | 5 | Reports & Visuals | Generate performance metrics, equity curves, and setup plots | REP-01, REP-02, REP-03, REP-04 | 3 |
