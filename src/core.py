@@ -33,6 +33,8 @@ class StrategyThresholds:
     min_clearance_to_internal_points: float = 2.0
     min_target_distance_points: float = 15.0
     min_internal_high_clearance: float = 2.0
+    htf_timeframe: str = "1h"
+    htf_swing_lookback: int = 5
 
 THRESHOLDS = StrategyThresholds()
 

@@ -48,8 +48,9 @@ def detect_swing_low(candles: List[Candle], index: int, lookback: int = THRESHOL
     return SwingLow(price=candidate_low, bar_index=index, confirmed_at_index=index + lookback, candle_time=candles[index].timestamp)
 
 class SwingRegistry:
-    def __init__(self, lookback: int = THRESHOLDS.swing_lookback):
+    def __init__(self, lookback: int = THRESHOLDS.swing_lookback, prune_enabled: bool = True):
         self.lookback = lookback
+        self.prune_enabled = prune_enabled
         self.confirmed_highs: List[SwingHigh] = []
         self.confirmed_lows:  List[SwingLow]  = []
         self.candle_buffer:   List[Candle]    = []
@@ -69,9 +70,10 @@ class SwingRegistry:
         if sl:
             self.confirmed_lows.append(sl)
             
-        # Prune old swings (keep last 200 bars worth)
-        self.confirmed_highs = [h for h in self.confirmed_highs if current_index - h.bar_index <= 200]
-        self.confirmed_lows  = [l for l in self.confirmed_lows if current_index - l.bar_index <= 200]
+        # Prune old swings (keep last 200 bars worth) every 1000 bars to save CPU
+        if self.prune_enabled and current_index % 1000 == 0:
+            self.confirmed_highs = [h for h in self.confirmed_highs if current_index - h.bar_index <= 200]
+            self.confirmed_lows  = [l for l in self.confirmed_lows if current_index - l.bar_index <= 200]
         
     def get_nearest_high_above(self, price: float) -> Optional[SwingHigh]:
         candidates = [h for h in self.confirmed_highs if h.price > price]
@@ -80,3 +82,9 @@ class SwingRegistry:
     def get_nearest_low_below(self, price: float) -> Optional[SwingLow]:
         candidates = [l for l in self.confirmed_lows if l.price < price]
         return max(candidates, key=lambda l: l.price) if candidates else None
+
+    def get_recent_highs(self, n: int = 10) -> List[SwingHigh]:
+        return sorted(self.confirmed_highs, key=lambda h: h.bar_index, reverse=True)[:n]
+    
+    def get_recent_lows(self, n: int = 10) -> List[SwingLow]:
+        return sorted(self.confirmed_lows, key=lambda l: l.bar_index, reverse=True)[:n]

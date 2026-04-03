@@ -14,7 +14,6 @@ class ModelType(Enum):
     CONTINUATION = "continuation"
 
 class StopType(Enum):
-    FAIL_STOP = "fail_stop"
     SWING_STOP = "swing_stop"
     NARROW_STOP = "narrow_stop"
 
@@ -35,7 +34,6 @@ class TradeSetup:
     entry_price: float
     stop_type: StopType
     stop_price: float
-    fail_stop_level: float
     target_price: float
     break_even_trigger: float
     invalidation_price: float
@@ -43,6 +41,7 @@ class TradeSetup:
     internal_level: float
     risk_reward: float
     momentum_score: float
+    reasoning: str = ""
 
 @dataclass
 class TradeResult:
@@ -61,11 +60,10 @@ class TradeResult:
         return TradeResult(setup, candle.timestamp, exit_price, "TARGET_HIT", 0.0)
 
 class TradeState:
-    def __init__(self, entry_filled=False, break_even_active=False, current_stop=0.0, fail_stop_level=0.0):
+    def __init__(self, entry_filled=False, break_even_active=False, current_stop=0.0):
         self.entry_filled = entry_filled
         self.break_even_active = break_even_active
         self.current_stop = current_stop
-        self.fail_stop_level = fail_stop_level
         self.entry_candle = None
 
 @dataclass
@@ -78,3 +76,4 @@ class SimulationConfig:
     point_value: float = 20.00
     min_contracts: int = 1
     max_contracts: int = 10
+    save_charts: bool = False
