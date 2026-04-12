@@ -13,6 +13,7 @@ from src.execution import (
     TradeSetup, Direction, ModelType, StopType, 
     SignalGrade, SimulationConfig, TradeResult, TradeState
 )
+from tqdm import tqdm
 from src.plotting import build_setup_chart
 from src.metrics import get_performance_summary
 from src.dashboard import generate_dashboard
@@ -159,7 +160,8 @@ def run_backtest(data_path: str, start_date=None, end_date=None, output_root=Non
     
     print(f"Simulation Start: {len(timestamps):,} candles. Saving to {output_base}")
 
-    for i in range(len(timestamps)):
+    pbar = tqdm(range(len(timestamps)), desc="Backtesting", unit="candle")
+    for i in pbar:
         # Lazy create candle for the logic that needs it
         candle = Candle(timestamps[i], opens[i], highs[i], lows[i], closes[i])
         
@@ -231,6 +233,7 @@ def run_backtest(data_path: str, start_date=None, end_date=None, output_root=Non
                                     chart = build_setup_chart(result, df)
                                     chart.write_html(str(setups_dir / f"{setup.setup_id}.html"))
                                 current_sweep = None
+                                pbar.set_postfix(trades=len(all_results))
                                 break
                     else:
                         # SHORT Logic
@@ -272,12 +275,13 @@ def run_backtest(data_path: str, start_date=None, end_date=None, output_root=Non
                                     chart = build_setup_chart(result, df)
                                     chart.write_html(str(setups_dir / f"{setup.setup_id}.html"))
                                 current_sweep = None
+                                pbar.set_postfix(trades=len(all_results))
                                 break
 
         # Prune old FVGs/Levels and keep list small
         if i % 1000 == 0:
             active_fvgs   = active_fvgs[-100:]
-            print(f"Processed {i:,} / {len(timestamps):,} candles... Trades so far: {len(all_results)}")
+            pbar.set_postfix(trades=len(all_results))
             
     print(f"Simulation Finished: {len(timestamps):,} / {len(timestamps):,} candles. Total Trades: {len(all_results)}")
     
