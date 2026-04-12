@@ -67,7 +67,9 @@ BBO microstructure (bid-ask spread, order book imbalance, sub-minute momentum) i
 2. **Engine Integration** (`main.py`): Inject gamma levels as `LiquidityLevel` objects in the daily loop
 3. **Feature Extraction** (`src/ml_features.py`): At each setup, compute gamma-derived features
 4. **XGBoost Pipeline** (`src/ml_pipeline.py`): Train/validate with Optuna, walk-forward evaluation
-5. **Dashboard Update** (`src/dashboard.py`): Show ML-filtered vs mechanical performance comparison
+5. **Dashboard Update & Visual ML Metrics** (`src/dashboard.py` & `src/ml_visualizations.py`): 
+   - Integrate ML-filtered vs Mechanical baseline equity curves in the main HTML dashboard
+   - Auto-generate interactive HTML visual metrics for the ML pipeline (Feature Importance charts, ROC/AUC curves, Precision-Recall curves, and Confusion Matrices) after every run.
 
 ### 10. Deferred Ideas
 - BBO spread/imbalance features (Phase 14)

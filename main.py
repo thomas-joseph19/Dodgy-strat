@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import os
 import webbrowser
+import xgboost as xgb
 from pathlib import Path
 from typing import List
 from datetime import datetime, timedelta
@@ -17,6 +18,9 @@ from tqdm import tqdm
 from src.plotting import build_setup_chart
 from src.metrics import get_performance_summary
 from src.dashboard import generate_dashboard
+from src.gamma import SyntheticGammaEngine
+from src.ml_features import FeatureExtractor
+from src.ml_pipeline import MLPipeline
 
 # ── Simulation Runner ───────────────────────────────────────────
 
@@ -90,7 +94,30 @@ def _classify_session(ts: datetime) -> str:
 
 # ── Main Loop ───────────────────────────────────────────────────
 
-def run_backtest(data_path: str, start_date=None, end_date=None, output_root=None, save_charts=False):
+def run_backtest(data_path: str, start_date=None, end_date=None, output_root=None, save_charts=False, extract_features=False, ml_config=None, use_ml=False, model_path=None, ml_threshold=0.5, optimized=False):
+
+
+    # Initialize Gamma Engine
+    gamma_engine = SyntheticGammaEngine(
+        options_dir="ML data/parquet_qqq",
+        underlying_path="ML data/parquet_qqq/underlying_prices.parquet"
+    )
+    feature_extractor = FeatureExtractor()
+    trade_features = []
+    
+    # ML Model Loading
+    ml_model = None
+    if (use_ml or optimized) and model_path:
+        # Default to latest if no specific path provided
+        actual_path = model_path if model_path else "models/latest/xgboost_model.json"
+        
+        if os.path.exists(actual_path):
+            print(f"🚀 RUNNING OPTIMIZED: {actual_path} (Threshold: {ml_threshold})")
+            ml_model = xgb.Booster()
+            ml_model.load_model(actual_path)
+        else:
+            print(f"⚠️ Warning: Optimized model not found at {actual_path}. Running naked backtest.")
+
     df = pd.read_parquet(data_path)
     df['timestamp'] = pd.to_datetime(df['timestamp'])
     
@@ -149,6 +176,9 @@ def run_backtest(data_path: str, start_date=None, end_date=None, output_root=Non
     all_results = []
     config = SimulationConfig(save_charts=save_charts)
     
+    current_day = None
+    daily_gex_profile = None
+    
     # Output Configuration: Unique folder for each run
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_base = Path(output_root or r"D:\Algorithms\Dodgy Backtest Results") / f"run_{run_id}"
@@ -162,6 +192,37 @@ def run_backtest(data_path: str, start_date=None, end_date=None, output_root=Non
 
     pbar = tqdm(range(len(timestamps)), desc="Backtesting", unit="candle")
     for i in pbar:
+        # Detect new day to update Gamma levels
+        if current_day != timestamps[i].date():
+            current_day = timestamps[i].date()
+            daily_gex_profile = gamma_engine.compute_daily_gex_profile(timestamps[i], closes[i])
+            
+            if daily_gex_profile:
+                # Add Flip level and Clusters to intact_levels
+                # We mark them as formed 'yesterday' so they are immediately active
+                formed_at = timestamps[i] - timedelta(days=1)
+                
+                # Add GEX Flip
+                intact_levels.append(LiquidityLevel(
+                    price=daily_gex_profile['gex_flip'], level_type="BSL", # Check both sides for sweep
+                    quality="GEX_FLIP", quality_rank=2, formed_at=formed_at, is_intact=True
+                ))
+                intact_levels.append(LiquidityLevel(
+                    price=daily_gex_profile['gex_flip'], level_type="SSL",
+                    quality="GEX_FLIP", quality_rank=2, formed_at=formed_at, is_intact=True
+                ))
+                
+                # Add Clusters
+                for cluster_px in daily_gex_profile['gamma_clusters']:
+                    intact_levels.append(LiquidityLevel(
+                        price=cluster_px, level_type="BSL",
+                        quality="GAMMA_CLUSTER", quality_rank=2, formed_at=formed_at, is_intact=True
+                    ))
+                    intact_levels.append(LiquidityLevel(
+                        price=cluster_px, level_type="SSL",
+                        quality="GAMMA_CLUSTER", quality_rank=2, formed_at=formed_at, is_intact=True
+                    ))
+
         # Lazy create candle for the logic that needs it
         candle = Candle(timestamps[i], opens[i], highs[i], lows[i], closes[i])
         
@@ -226,9 +287,28 @@ def run_backtest(data_path: str, start_date=None, end_date=None, output_root=Non
                             )
                             
                             if setup.risk_reward >= 1.5:
+                                # ── ML Filtering Inference ──────────────────────
+                                if ml_model:
+                                    context = {"gamma": daily_gex_profile}
+                                    feats = feature_extractor.get_features(setup, context)
+                                    f_df = pd.DataFrame([feats]).drop(columns=['setup_id', 'timestamp'], errors='ignore')
+                                    prob = ml_model.predict(xgb.DMatrix(f_df))[0]
+                                    if prob < ml_threshold:
+                                        continue
+
                                 result = evaluate_setup(setup, timestamps, highs, lows, closes, i, config)
                                 result.net_pnl = calculate_net_pnl(result, 1, config)
                                 all_results.append(result)
+
+                                # ML Feature Extraction
+                                if extract_features:
+                                    context = {"gamma": daily_gex_profile}
+                                    feats = feature_extractor.get_features(setup, context)
+                                    feats['setup_id'] = setup.setup_id
+                                    feats['timestamp'] = setup.created_at.strftime('%Y-%m-%d %H:%M:%S')
+                                    feats['label'] = 1 # We'll update this if exit_type is STOP
+                                    trade_features.append(feats)
+
                                 if save_charts:
                                     chart = build_setup_chart(result, df)
                                     chart.write_html(str(setups_dir / f"{setup.setup_id}.html"))
@@ -268,9 +348,28 @@ def run_backtest(data_path: str, start_date=None, end_date=None, output_root=Non
                             )
                             
                             if setup.risk_reward >= 1.5:
+                                # ── ML Filtering Inference ──────────────────────
+                                if ml_model:
+                                    context = {"gamma": daily_gex_profile}
+                                    feats = feature_extractor.get_features(setup, context)
+                                    f_df = pd.DataFrame([feats]).drop(columns=['setup_id', 'timestamp'], errors='ignore')
+                                    prob = ml_model.predict(xgb.DMatrix(f_df))[0]
+                                    if prob < ml_threshold:
+                                        continue
+
                                 result = evaluate_setup(setup, timestamps, highs, lows, closes, i, config)
                                 result.net_pnl = calculate_net_pnl(result, 1, config)
                                 all_results.append(result)
+
+                                # ML Feature Extraction
+                                if extract_features:
+                                    context = {"gamma": daily_gex_profile}
+                                    feats = feature_extractor.get_features(setup, context)
+                                    feats['setup_id'] = setup.setup_id
+                                    feats['timestamp'] = setup.created_at.strftime('%Y-%m-%d %H:%M:%S')
+                                    feats['label'] = 1
+                                    trade_features.append(feats)
+
                                 if save_charts:
                                     chart = build_setup_chart(result, df)
                                     chart.write_html(str(setups_dir / f"{setup.setup_id}.html"))
@@ -328,6 +427,42 @@ def run_backtest(data_path: str, start_date=None, end_date=None, output_root=Non
     
     pd.DataFrame(trade_rows).to_csv(output_base / "trades.csv", index=False)
     print(f"Trade log saved: {output_base / 'trades.csv'} ({len(trade_rows)} trades)")
+
+    # ── Save ML Features ────────────────────────────────────────
+    if extract_features and trade_features:
+        # Update labels based on actual result
+        results_map = {r.setup.setup_id: r for r in all_results}
+        for f in trade_features:
+            res = results_map.get(f['setup_id'])
+            if res:
+                f['label'] = 1 if res.exit_type == "TARGET_HIT" else 0
+        
+        pd.DataFrame(trade_features).to_csv(output_base / "features.csv", index=False)
+        print(f"ML Features saved: {output_base / 'features.csv'}")
+
+        # ── Automated ML Training ───────────────────────────────
+        if (ml_config and ml_config.get('run_ml')) or (ml_config and ml_config.get('auto_optimize')):
+            print("\n" + "═"*40)
+            print("AUTO-ML OPTIMIZATION STARTING")
+            print("═"*40)
+            
+            output_dir = ml_config.get('out_dir') or str(output_base / "ml_optimization")
+            if ml_config.get('auto_optimize'):
+                output_dir = "models/latest"
+            
+            pipeline = MLPipeline(
+                data_path=str(output_base / "features.csv"),
+                output_dir=output_dir,
+                train_start=ml_config.get('train_start'),
+                train_end=ml_config.get('train_end'),
+                test_start=ml_config.get('test_start'),
+                test_end=ml_config.get('test_end')
+            )
+            pipeline.run()
+            
+            if ml_config.get('auto_optimize'):
+                print(f"✅ Auto-Optimization Complete. Model saved to: {output_dir}")
+                print(f"👉 To use this model, run: python main.py --optimized")
     
     # ── Generate HTML Dashboard ─────────────────────────────────
     dashboard_path = generate_dashboard(
@@ -352,13 +487,65 @@ if __name__ == "__main__":
     parser.add_argument("--output-root", type=str, default=r"D:\Algorithms\Dodgy Backtest Results",
                         help="Root output directory")
     parser.add_argument("--no-charts", action="store_true", help="Skip per-trade Plotly HTML charts")
+    parser.add_argument("--extract-features", action="store_true", help="Extract ML features for trades")
     
+    # ML Chaining Arguments
+    parser.add_argument("--run-ml", action="store_true", help="Run ML pipeline immediately after backtest")
+    parser.add_argument("--train-start", type=str, help="ML Train Start (YYYY-MM-DD)")
+    parser.add_argument("--train-end", type=str, help="ML Train End (YYYY-MM-DD)")
+    parser.add_argument("--test-start", type=str, help="ML Test Start (YYYY-MM-DD)")
+    parser.add_argument("--test-end", type=str, help="ML Test End (YYYY-MM-DD)")
+    parser.add_argument("--out", type=str, help="Custom output directory for ML models")
+    
+    # Inference Filtering
+    parser.add_argument("--use-ml", action="store_true", help="Apply ML model to filter trades in backtest")
+    parser.add_argument("--model-path", type=str, help="Path to trained xgboost_model.json")
+    parser.add_argument("--ml-threshold", type=float, default=0.5, help="Minimum probability to take trade")
+    
+    # Simplify Life flags
+    parser.add_argument("--auto-optimize", action="store_true", help="One-click full training with safe defaults")
+    parser.add_argument("--optimized", action="store_true", help="Run backtest using the latest trained model")
+
     args = parser.parse_args()
     
+    # Sensible defaults for auto-optimize (only if not provided by user)
+    train_start = args.train_start
+    train_end = args.train_end
+    if args.auto_optimize:
+        if not train_start: train_start = "2020-01-01"
+        if not train_end:   train_end = "2024-12-31"
+
+    # Sync Backtest window with ML window for speed
+    backtest_start = args.start
+    backtest_end = args.end
+    if args.auto_optimize:
+        if not backtest_start: backtest_start = train_start
+        # If user provided a test window, make sure backtest includes it
+        if not backtest_end: 
+            if args.test_end: backtest_end = args.test_end
+            elif args.test_start: backtest_end = None # Run until actual end
+            else: backtest_end = train_end
+
+    ml_config = {
+        'run_ml': args.run_ml or args.auto_optimize,
+        'auto_optimize': args.auto_optimize,
+        'train_start': train_start,
+        'train_end': train_end,
+        'test_start': args.test_start,
+        'test_end': args.test_end,
+        'out_dir': args.out
+    }
+
     run_backtest(
         args.data,
-        start_date=args.start,
-        end_date=args.end,
+        start_date=backtest_start,
+        end_date=backtest_end,
         output_root=args.output_root,
-        save_charts=not args.no_charts
+        save_charts=not args.no_charts,
+        extract_features=args.extract_features or ml_config['run_ml'] or args.optimized,
+        ml_config=ml_config,
+        use_ml=args.use_ml or args.optimized,
+        model_path=args.model_path,
+        ml_threshold=args.ml_threshold,
+        optimized=args.optimized
     )

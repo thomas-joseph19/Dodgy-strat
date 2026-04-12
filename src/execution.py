@@ -12,6 +12,8 @@ class Direction(Enum):
 class ModelType(Enum):
     REVERSAL = "reversal"
     CONTINUATION = "continuation"
+    GAMMA_REVERSAL = "gamma_reversal"
+    GEX_FLIP = "gex_flip"
 
 class StopType(Enum):
     SWING_STOP = "swing_stop"

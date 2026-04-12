@@ -3,3 +3,7 @@ numpy
 plotly
 pyarrow
 fastparquet
+xgboost
+optuna
+scikit-learn
+tqdm

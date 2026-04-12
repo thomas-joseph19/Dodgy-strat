@@ -1,0 +1,1 @@
+{"lambda": 6.4280501522644995e-06, "alpha": 5.578304740197147e-07, "max_depth": 6, "eta": 0.003299249224089901, "gamma": 0.2319207770118626, "grow_policy": "depthwise", "objective": "binary:logistic", "eval_metric": "auc"}
