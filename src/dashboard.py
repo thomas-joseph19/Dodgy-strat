@@ -33,6 +33,16 @@ def _classify_session(ts: datetime) -> str:
     return "overnight"
 
 
+def _classify_region(ts: datetime) -> str:
+    """Classify a timestamp into a global region session."""
+    h = ts.hour
+    if 9 <= h < 16 or (h == 9 and ts.minute >= 30):
+        return "ny"
+    if 3 <= h < 9 or (h == 9 and ts.minute < 30):
+        return "london"
+    return "asia"
+
+
 def _session_label(code: str) -> str:
     return {
         "pre_market": "Pre-Mkt",
@@ -64,6 +74,7 @@ def _build_trade_records(results: List[TradeResult]) -> list[dict]:
             "setup_id": r.setup.setup_id,
             "direction": r.setup.direction.value,
             "session": _classify_session(r.setup.created_at),
+            "region": _classify_region(r.setup.created_at),
             "entry": round(entry, 2),
             "stop": round(stop, 2),
             "target": round(r.setup.target_price, 2),
@@ -115,7 +126,7 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
 <title>{{TITLE}}</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
 <style>
-  :root{--bg:#0b1220;--surface:#121a2b;--surface2:#172134;--border:#2a3853;--text:#e8eefc;--muted:#8ea0c4;--accent:#5cd6ff;--pre:#d8a7ff;--open:#73b7ff;--mid:#ffd56a;--pwr:#ff9a76;--ovn:#a3f7bf;--win:#4ade80;--loss:#fb7185}
+  :root{--bg:#0b1220;--surface:#121a2b;--surface2:#172134;--border:#2a3853;--text:#e8eefc;--muted:#8ea0c4;--accent:#5cd6ff;--pre:#d8a7ff;--open:#73b7ff;--mid:#ffd56a;--pwr:#ff9a76;--ovn:#a3f7bf;--asia:#ffd56a;--london:#73b7ff;--ny:#4ade80;--win:#4ade80;--loss:#fb7185}
   *{box-sizing:border-box}
   body{margin:0;background:radial-gradient(circle at top,#15213b 0%,#0b1220 55%);color:var(--text);font:14px/1.4 "Segoe UI",system-ui,sans-serif}
   .wrap{max-width:1550px;margin:0 auto;padding:28px}
@@ -157,6 +168,9 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
   .badge.midday{background:rgba(255,213,106,.15);color:var(--mid)}
   .badge.power_hour{background:rgba(255,154,118,.15);color:var(--pwr)}
   .badge.overnight{background:rgba(163,247,191,.14);color:var(--ovn)}
+  .badge.asia{background:rgba(255,213,106,.15);color:var(--asia)}
+  .badge.london{background:rgba(115,183,255,.14);color:var(--london)}
+  .badge.ny{background:rgba(74,222,128,.14);color:var(--ny)}
   .scroll{max-height:480px;overflow:auto}
   .note{color:var(--muted);font-size:12px}
   @media (max-width:980px){.grid{grid-template-columns:1fr}.chart-wrap{height:320px}}
@@ -217,6 +231,12 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
       <button class="pill session-pill" data-session="power_hour">Power Hr</button>
       <button class="pill session-pill" data-session="overnight">Overnight</button>
     </div>
+    <div class="toggle-row" style="margin-top:12px">
+      <button class="pill region-pill active" data-region="ANY">Any Region</button>
+      <button class="pill region-pill" data-region="asia">Asia</button>
+      <button class="pill region-pill" data-region="london">London</button>
+      <button class="pill region-pill" data-region="ny">NY</button>
+    </div>
     <div class="toggle-row" id="portfolio-filters" style="margin-top:12px;font-size:12px;color:var(--muted);align-items:center;">
       <span style="font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-right:6px">Include in Portfolio:</span>
       <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" class="portfolio-filter" value="pre_market" checked> Pre-Mkt</label>
@@ -241,6 +261,11 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
       <table>
         <thead><tr><th>Session</th><th class="num">Trades</th><th class="num">Win %</th><th class="num">USD</th><th class="num">PF</th><th class="num">Sharpe</th><th class="num">Max DD</th></tr></thead>
         <tbody id="sessionTableBody"></tbody>
+      </table>
+      <div class="note" style="margin-top:20px;margin-bottom:10px">Region specific performance (Global Sessions).</div>
+      <table>
+        <thead><tr><th>Region</th><th class="num">Trades</th><th class="num">Win %</th><th class="num">USD</th><th class="num">PF</th><th class="num">Max DD</th></tr></thead>
+        <tbody id="regionTableBody"></tbody>
       </table>
     </div>
   </div>
@@ -303,11 +328,14 @@ const INITIAL_CAPITAL = {{INITIAL_CAPITAL}};
 const POINT_VALUE = 20;
 const DOW = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 const SESSION_LABELS = {pre_market:"Pre-Mkt",open_drive:"Open Drive",midday:"Midday",power_hour:"Power Hr",overnight:"Overnight"};
+const REGION_LABELS = {asia:"Asia",london:"London",ny:"NY"};
 const SESSIONS = ["pre_market","open_drive","midday","power_hour","overnight"];
+const REGIONS = ["asia","london","ny"];
 
 /* ── State ────────────────────────────────────────────── */
 let mode = "raw";
 let activeSession = "PORTFOLIO";
+let activeRegion = "ANY";
 let chart = null;
 
 /* ── Helpers ──────────────────────────────────────────── */
@@ -343,6 +371,10 @@ function getFiltered(){
     arr = arr.filter(t=>included.has(t.session));
   } else {
     arr = arr.filter(t=>t.session===activeSession);
+  }
+
+  if(activeRegion!=="ANY"){
+    arr = arr.filter(t=>t.region===activeRegion);
   }
   return arr;
 }
@@ -480,6 +512,20 @@ function renderSessionTable(){
   body.innerHTML = rows || '<tr><td colspan="7" class="note">No data</td></tr>';
 }
 
+function renderRegionTable(){
+  const trades = getFiltered();
+  const body=$("regionTableBody");
+  let rows = "";
+  REGIONS.forEach(reg=>{
+    const st = trades.filter(t=>t.region===reg);
+    if(!st.length) return;
+    const s = calcStats(st);
+    if(!s) return;
+    rows += `<tr><td><span class="badge ${reg}">${REGION_LABELS[reg]}</span></td><td class="num">${s.n}</td><td class="num">${pct(s.winRate)}</td><td class="num ${clr(s.totalPnl)}">$${fmt(s.totalPnl)}</td><td class="num">${fmt(s.pf)}</td><td class="num loss">${pct(s.maxDD)}</td></tr>`;
+  });
+  body.innerHTML = rows || '<tr><td colspan="6" class="note">No data</td></tr>';
+}
+
 function renderDOW(){
   const trades = getFiltered();
   const body=$("dowTableBody");
@@ -578,6 +624,7 @@ function recalc(){
   renderStats(stats);
   renderChart(stats);
   renderSessionTable();
+  renderRegionTable();
   renderDOW();
   renderYears();
   renderOutcomes();
@@ -633,6 +680,15 @@ document.querySelectorAll(".session-pill").forEach(btn=>{
     btn.classList.add("active");
     activeSession = btn.dataset.session;
     $("portfolio-filters").style.display = activeSession==="PORTFOLIO"?"flex":"none";
+    recalc();
+  });
+});
+
+document.querySelectorAll(".region-pill").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    document.querySelectorAll(".region-pill").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    activeRegion = btn.dataset.region;
     recalc();
   });
 });
