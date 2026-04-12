@@ -18,3 +18,13 @@
 ## Phase 11: Monte Carlo Simulation & Sensitivity Analysis [PENDING]
 - **Goal:** Run stress tests and trade reshuffling to verify strategy robustness across different market regimes.
 - **Success:** Confirmed statistical persistence of the strategy under variation of slippage and execution sequence.
+
+### Phase 12: 10-Year Mechanical Backtest with Interactive HTML Dashboard
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 11
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 12 to break down)
