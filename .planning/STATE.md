@@ -1,7 +1,7 @@
 # Project State
 
 ## Current Focus
-Phase 14: BBO Microstructure Signal Integration for Entry Optimization
+Phase 15: Dual-Strategy Parallel Backtest with Combined Performance Dashboard (Daniel + LG Model)
 
 ## Accumulated Context
 
@@ -10,3 +10,4 @@ Phase 14: BBO Microstructure Signal Integration for Entry Optimization
 - Phase 12 completed: 10-Year Mechanical Backtest with Interactive HTML Dashboard
 - Phase 13 completed: ML Signal Enhancement with Synthetic Gamma & EOD Options Data
 - Phase 14 added: BBO Microstructure Signal Integration for Entry Optimization
+- Phase 15 added: Dual-Strategy Parallel Backtest with Combined Performance Dashboard (Daniel + LG Model)

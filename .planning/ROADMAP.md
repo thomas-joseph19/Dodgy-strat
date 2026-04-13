@@ -30,3 +30,13 @@
 ### Phase 14: BBO Microstructure Signal Integration for Entry Optimization [NEXT]
 - **Goal:** Incorporate 1-second BBO bid/ask imbalance into entry gating.
 - **Success:** Order book pressure features integrated into the ML feature vector.
+
+### Phase 15: Dual-Strategy Parallel Backtest with Combined Performance Dashboard (Daniel + LG Model)
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 14
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 15 to break down)
