@@ -183,21 +183,29 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
   <div class="hero">
     <div>
       <h1 id="dashTitle">{{TITLE}}</h1>
-      <div class="sub">Mechanical IFVG backtest dashboard — session-specific DodgysDD breakdowns. Toggle session, slippage mode, and contract sizing live. Default view starts at $100,000 with 1 contract.</div>
+      <div class="sub">Mechanical IFVG backtest dashboard — session-specific DodgysDD breakdowns. Toggle session, slippage mode, and position sizing live. Default view starts at $100,000.</div>
     </div>
     <div class="panel" style="min-width:320px">
       <div class="note">Saved outputs: <strong>dashboard.html</strong> and <strong>trades.csv</strong></div>
-      <div class="note" style="margin-top:8px">Pure mechanical strategy — no ML filtering applied. This is the ground-truth baseline from the v1.0 backtest engine over the full available dataset.</div>
+      <div class="note" style="margin-top:8px">Position sizing can be adjusted below. "Risk %" calculates contracts based on stop distance.</div>
     </div>
   </div>
 
   <!-- Controls -->
   <div class="panel">
     <div class="controls">
-      <div class="control"><label>Contract Size</label><input id="contractsInput" type="number" min="1" step="1" value="1"/></div>
+      <div class="control">
+        <label>Sizing Mode</label>
+        <select id="sizingModeInput">
+          <option value="fixed">Fixed Contracts</option>
+          <option value="risk">Risk Percentage</option>
+        </select>
+      </div>
+      <div class="control"><label id="contractsLabel">Contract Size</label><input id="contractsInput" type="number" min="1" step="1" value="1"/></div>
+      <div class="control"><label id="riskPctLabel" style="display:none">Risk % per Trade</label><input id="riskPctInput" type="number" min="0.1" step="0.1" value="1.0" style="display:none"/></div>
       <div class="control"><label>Initial Equity</label><input id="equityInput" type="number" min="1000" step="1000" value="{{INITIAL_CAPITAL}}"/></div>
-      <div class="control"><label>Round-Trip Slippage</label><input id="slippageInput" type="number" min="0" step="0.05" value="0.50"/></div>
-      <div class="control"><label>Commission / Contract / RT</label><input id="commissionInput" type="number" min="0" step="0.1" value="4.00"/></div>
+      <div class="control"><label>Round-Trip Slippage</label><input id="slippageInput" type="number" min="0" step="0.05" value="0.00"/></div>
+      <div class="control"><label>Commission / Contract / RT</label><input id="commissionInput" type="number" min="0" step="0.1" value="3.10"/></div>
       <div class="control"><label>Timeframe Preset</label>
         <select id="timeframePreset">
           <option value="full">Full history</option>
@@ -243,7 +251,7 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
       <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" class="portfolio-filter" value="open_drive" checked> Open Drive</label>
       <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" class="portfolio-filter" value="midday" checked> Midday</label>
       <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" class="portfolio-filter" value="power_hour" checked> Power Hr</label>
-      <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" class="portfolio-filter" value="overnight" checked> Overnight</label>
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" class="portfolio-filter" value="overnight"> Overnight</label>
     </div>
   </div>
 
@@ -312,7 +320,7 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
     <div class="scroll">
       <table>
         <thead><tr>
-          <th>Date</th><th>Session</th><th>Side</th><th class="num">Entry</th><th class="num">Stop</th><th class="num">Risk</th><th class="num">P/L pts</th><th class="num">P/L USD</th><th class="num">R</th><th>Exit</th>
+          <th>Date</th><th>Session</th><th>Side</th><th class="num">Entry</th><th class="num">Stop</th><th class="num">Risk</th><th class="num">Qty</th><th class="num">P/L pts</th><th class="num">P/L USD</th><th class="num">R</th><th>Exit</th>
         </tr></thead>
         <tbody id="tradeLogBody"></tbody>
       </table>
@@ -345,8 +353,23 @@ function fmt(n,d=2){return n.toLocaleString(undefined,{minimumFractionDigits:d,m
 function pct(n){return (n*100).toFixed(1)+"%"}
 function clr(n){return n>=0?"win":"loss"}
 
-function tradePnl(t){
-  const contracts = val("contractsInput");
+function tradePnl(t, currentEquity = null){
+  const mode_sizing = $("sizingModeInput").value;
+  let contracts = 1;
+
+  if (mode_sizing === "fixed") {
+    contracts = val("contractsInput");
+  } else {
+    const risk_pct = val("riskPctInput") / 100;
+    const equity = currentEquity || val("equityInput");
+    const risk_dollars = equity * risk_pct;
+    const stop_points = t.risk_points || 1;
+    const risk_per_contract = stop_points * POINT_VALUE;
+    contracts = Math.floor(risk_dollars / risk_per_contract);
+    if (contracts < 1) contracts = 1;
+    if (contracts > 50) contracts = 50; // Safety cap
+  }
+
   let pts = t.pnl_points;
   if(mode==="net"){
     const slip = val("slippageInput");
@@ -354,7 +377,7 @@ function tradePnl(t){
   }
   const usd = pts * POINT_VALUE * contracts;
   const comm = mode==="net" ? val("commissionInput")*contracts : 0;
-  return {pts, usd: usd - comm};
+  return {pts, usd: usd - comm, contracts};
 }
 
 function getFiltered(){
@@ -393,7 +416,7 @@ function calcStats(trades){
   const grossLoss = Math.abs(losses.reduce((a,b)=>a+b,0));
   const pf = grossLoss>0 ? grossWin/grossLoss : grossWin>0?Infinity:0;
   const avgTrade = totalPnl/n;
-  const rs = pnls.map(p=>p.pts / (trades[pnls.indexOf(p)].risk_points||1));
+  const rs = pnls.map((p, i)=>p.pts / (trades[i].risk_points||1));
   const avgR = rs.reduce((a,b)=>a+b,0)/n;
   const ev = avgTrade;
 
@@ -470,7 +493,9 @@ function renderChart(s){
   const ctx = $("equityChart").getContext("2d");
   if(chart) chart.destroy();
   if(!s) return;
-  $("chartTitle").textContent = `Equity curve — ${activeSession==="PORTFOLIO"?"Portfolio":SESSION_LABELS[activeSession]||activeSession} · ${mode==="raw"?"Raw":"Net"} · ${val("contractsInput")} contract(s)`;
+  const mode_sizing = $("sizingModeInput").value;
+  const sizingStr = mode_sizing === "fixed" ? `${val("contractsInput")} contract(s)` : `${val("riskPctInput")}% Risk`;
+  $("chartTitle").textContent = `Equity curve — ${activeSession==="PORTFOLIO"?"Portfolio":SESSION_LABELS[activeSession]||activeSession} · ${mode==="raw"?"Raw":"Net"} · ${sizingStr}`;
   chart = new Chart(ctx,{
     type:"line",
     data:{
@@ -533,7 +558,7 @@ function renderDOW(){
   for(let d=0;d<5;d++){
     const dt = trades.filter(t=>t.day_of_week===d);
     if(!dt.length) continue;
-    const pnls = dt.map(t=>tradePnl(t));
+    const pnls = dt.map((t, i)=>tradePnl(t)); // Note: DOW doesn't easily support compounding without context, so we use static
     const totalPts = pnls.reduce((a,p)=>a+p.pts,0);
     const totalUsd = pnls.reduce((a,p)=>a+p.usd,0);
     const wr = dt.filter((_,i)=>pnls[i].usd>0).length/dt.length;
@@ -608,6 +633,7 @@ function renderTradeLog(){
       <td class="num">${fmt(t.entry)}</td>
       <td class="num">${fmt(t.stop)}</td>
       <td class="num">${fmt(t.risk_points)}</td>
+      <td class="num">${p.contracts}</td>
       <td class="num ${rc}">${fmt(p.pts)}</td>
       <td class="num ${rc}">$${fmt(p.usd)}</td>
       <td class="num">${fmt(p.pts/(t.risk_points||1))}R</td>
@@ -693,8 +719,17 @@ document.querySelectorAll(".region-pill").forEach(btn=>{
   });
 });
 
-["contractsInput","equityInput","slippageInput","commissionInput","fromDateInput","toDateInput"].forEach(id=>{
+["contractsInput","riskPctInput","equityInput","slippageInput","commissionInput","fromDateInput","toDateInput"].forEach(id=>{
   $(id).addEventListener("input",recalc);
+});
+
+$("sizingModeInput").addEventListener("change", function() {
+  const isRisk = this.value === "risk";
+  $("contractsInput").style.display = isRisk ? "none" : "block";
+  $("contractsLabel").style.display = isRisk ? "none" : "block";
+  $("riskPctInput").style.display = isRisk ? "block" : "none";
+  $("riskPctLabel").style.display = isRisk ? "block" : "none";
+  recalc();
 });
 
 $("timeframePreset").addEventListener("change",function(){

@@ -68,12 +68,18 @@ class TradeState:
         self.current_stop = current_stop
         self.entry_candle = None
 
+class SizingMode(Enum):
+    FIXED = "fixed"
+    RISK_PCT = "risk_pct"
+
 @dataclass
 class SimulationConfig:
     starting_capital: float = 100_000.00
+    sizing_mode: SizingMode = SizingMode.FIXED
+    fixed_contracts: int = 1
     risk_per_trade_pct: float = 0.01
-    commission_per_rt: float = 4.00
-    slippage_ticks: int = 1
+    commission_per_rt: float = 3.10
+    slippage_ticks: int = 0
     tick_size: float = 0.25
     point_value: float = 20.00
     min_contracts: int = 1

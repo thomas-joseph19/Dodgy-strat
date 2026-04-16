@@ -3,6 +3,22 @@ import numpy as np
 from typing import Dict, Any, List
 from src.execution import TradeSetup, Direction
 
+
+def nearest_cluster_distance(entry_price: float, gamma_context: Dict[str, Any]) -> float:
+    """Lightweight helper for rule filters that only need cluster distance."""
+    if not gamma_context:
+        return 999.0
+
+    clusters = gamma_context.get('gamma_clusters')
+    if not clusters:
+        return 999.0
+
+    clusters_arr = np.asarray(clusters, dtype=np.float64)
+    if clusters_arr.size == 0:
+        return 999.0
+
+    return float(np.min(np.abs(clusters_arr - entry_price)))
+
 class FeatureExtractor:
     """
     Extracts features for ML training from trade setups and market context.
@@ -40,11 +56,7 @@ class FeatureExtractor:
             features['gex_regime'] = 1 if g['total_gex'] > 0 else 0
             
             # Distance to nearest cluster
-            clusters = np.array(g['gamma_clusters'])
-            if len(clusters) > 0:
-                features['nearest_cluster_dist'] = np.min(np.abs(clusters - setup.entry_price))
-            else:
-                features['nearest_cluster_dist'] = 999.0
+            features['nearest_cluster_dist'] = nearest_cluster_distance(setup.entry_price, g)
         else:
             features['gex_flip_dist'] = 0.0
             features['total_gex'] = 0.0
