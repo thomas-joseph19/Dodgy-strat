@@ -22,14 +22,14 @@ class StrategyThresholds:
     level_equality_tolerance_pct: float = 0.0005
     min_level_separation_bars: int = 10
     min_sweep_extension_points: float = 1.0
-    max_sweep_body_violation_points: float = 2.0
+    max_sweep_body_violation_points: float = 15.0
     sweep_context_max_bars: int = 50
     min_fvg_size_points: float = 1.5
     min_impulse_body_ratio: float = 0.50
     min_impulse_size_points: float = 2.0
     max_gap_between_series_points: float = 2.0
     min_inversion_body_points: float = 1.0
-    min_rr_ratio: float = 2.0
+    min_rr_ratio: float = 1.5
     min_clearance_to_internal_points: float = 2.0
     min_target_distance_points: float = 15.0
     min_internal_high_clearance: float = 2.0

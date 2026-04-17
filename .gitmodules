@@ -1,0 +1,3 @@
+[submodule "strategies/lg_model"]
+	path = strategies/lg_model
+	url = https://github.com/cuzohh/lg-model.git

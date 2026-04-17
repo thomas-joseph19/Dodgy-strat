@@ -7,3 +7,7 @@ __pycache__/
 venv/
 backtest_results/
 final_report.txt
+
+# LG Model converted data files (large, regenerated from parquet)
+data/lg_format/
+strategies/lg_model/node_modules/

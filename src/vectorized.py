@@ -453,7 +453,7 @@ class VectorizedSweepDetector:
         self._bsl_refs = [r for r in self._bsl_refs if r.is_intact]
         self._dirty = True
 
-    def detect(self, h: float, l: float, c: float, ts, bar_idx: int, atr_value: float = None):
+    def detect(self, o: float, h: float, l: float, c: float, ts, bar_idx: int, atr_value: float = None):
         """
         Return a SweepEvent for the first matching level, or None.
         Equivalent to _detect_sweep_inline but ~30x faster on large level lists.
@@ -487,7 +487,7 @@ class VectorizedSweepDetector:
                 strength = "STRONG" if c > lv.price else "MODERATE"
                 # Lazy import to avoid circular deps — Candle is a lightweight dataclass
                 from src.core import Candle
-                return _SweepEventFactory.make(lv, Candle(ts, h, h, l, c), bar_idx, "SSL_SWEPT", strength)
+                return _SweepEventFactory.make(lv, Candle(ts, o, h, l, c), bar_idx, "SSL_SWEPT", strength)
 
         # ── BSL check ──────────────────────────────────────────────────────
         if self._bsl_ok.any():
@@ -506,7 +506,7 @@ class VectorizedSweepDetector:
                 lv = self._bsl_refs[first]
                 strength = "STRONG" if c < lv.price else "MODERATE"
                 from src.core import Candle
-                return _SweepEventFactory.make(lv, Candle(ts, h, h, l, c), bar_idx, "BSL_SWEPT", strength)
+                return _SweepEventFactory.make(lv, Candle(ts, o, h, l, c), bar_idx, "BSL_SWEPT", strength)
 
         return None
 

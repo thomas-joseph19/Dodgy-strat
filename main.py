@@ -47,6 +47,24 @@ def calculate_contracts(setup: TradeSetup, config: SimulationConfig, current_cap
     contracts = int(risk_dollars // contract_risk)
     return max(config.min_contracts, min(contracts, config.max_contracts))
 
+def calculate_contracts(setup: TradeSetup, config: SimulationConfig, current_capital: float) -> int:
+    if config.sizing_mode == SizingMode.FIXED:
+        return config.fixed_contracts
+    
+    # Risk-based sizing
+    risk_points = abs(setup.entry_price - setup.stop_price)
+    if risk_points <= 0:
+        return config.min_contracts
+        
+    risk_dollars = current_capital * config.risk_per_trade_pct
+    contract_risk = risk_points * config.point_value
+    
+    if contract_risk <= 0:
+        return config.min_contracts
+        
+    contracts = int(risk_dollars // contract_risk)
+    return max(config.min_contracts, min(contracts, config.max_contracts))
+
 def calculate_net_pnl(result: TradeResult, contracts: int, config: SimulationConfig) -> float:
     slippage_per_side = config.slippage_ticks * config.tick_size
 
@@ -111,8 +129,8 @@ def run_backtest(data_path: str, start_date=None, end_date=None, output_root=Non
 
     # Initialize Gamma Engine (year-level cache: parquet loaded once per year)
     gamma_engine = SyntheticGammaEngine(
-        options_dir="../data/DownloadedOptions/qqq",
-        underlying_path="../data/DownloadedOptions/qqq/underlying.parquet"
+        options_dir="data/DownloadedOptions/qqq",
+        underlying_path="data/DownloadedOptions/qqq/underlying.parquet"
     )
     feature_extractor = FeatureExtractor()
     trade_features = []
@@ -227,7 +245,6 @@ def run_backtest(data_path: str, start_date=None, end_date=None, output_root=Non
         risk_per_trade_pct=ml_config.get('risk_pct', 0.01)
     )
     current_equity = config.starting_capital
-
     current_day      = None
     daily_gex_profile = None
 
@@ -284,7 +301,7 @@ def run_backtest(data_path: str, start_date=None, end_date=None, output_root=Non
         ts_i = timestamps[i]
 
         curr_atr = atr_array[i] if atr_array is not None else None
-        sweep = sweep_detector.detect(h_i, l_i, c_i, ts_i, i, atr_value=curr_atr)
+        sweep = sweep_detector.detect(opens[i], h_i, l_i, c_i, ts_i, i, atr_value=curr_atr)
         if sweep:
             current_sweep = sweep
         elif current_sweep:
@@ -555,9 +572,8 @@ def run_backtest(data_path: str, start_date=None, end_date=None, output_root=Non
     )
     print(f"Dashboard saved: {dashboard_path}")
     webbrowser.open(f"file:///{Path(dashboard_path).resolve().as_posix()}")
-
     return all_results, config
-
+    return all_results, config
 
 if __name__ == "__main__":
     import argparse
@@ -569,11 +585,9 @@ if __name__ == "__main__":
                         help="Root output directory")
     parser.add_argument("--no-charts", action="store_true", help="Skip per-trade Plotly HTML charts")
     parser.add_argument("--extract-features", action="store_true", help="Extract ML features for trades")
-
     parser.add_argument("--contracts", type=int, default=1, help="Fixed contracts (if mode is fixed)")
     parser.add_argument("--risk-pct", type=float, default=0.01, help="Risk percentage (e.g. 0.01 for 1%%)")
     parser.add_argument("--sizing", type=str, choices=["fixed", "risk"], default="fixed", help="Sizing mode")
-
     parser.add_argument("--run-ml", action="store_true", help="Run ML pipeline immediately after backtest")
     parser.add_argument("--train-start", type=str, help="ML Train Start (YYYY-MM-DD)")
     parser.add_argument("--train-end", type=str, help="ML Train End (YYYY-MM-DD)")
