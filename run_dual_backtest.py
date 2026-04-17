@@ -169,6 +169,7 @@ def run_dual(
     mc_seed: int | None = None,
     mc_only: bool = False,
     trades_dir: str | None = None,
+    slippage_ticks: int = 1,
 ) -> None:
     """Orchestrate the dual backtest."""
     
@@ -197,9 +198,14 @@ def run_dual(
 
             # Step 2: Daniel Engine
             pbar.set_description(f"Step 2/5: {steps[1]}")
-            ensure_daniel_parquet_exists()
+            
+            # Use CSV if Parquet is gone
+            active_data_path = PARQUET_PATH if PARQUET_PATH.exists() else LG_M1_PATH
+            if not active_data_path.exists():
+                raise FileNotFoundError(f"No backtest data found at {PARQUET_PATH} or {LG_M1_PATH}")
+
             run_backtest(
-                data_path=str(PARQUET_PATH),
+                data_path=str(active_data_path),
                 start_date=start_date,
                 end_date=end_date,
                 output_root=str(run_dir),
@@ -207,10 +213,12 @@ def run_dual(
                 extract_features=False,
                 use_ml=False,
                 optimized=False,
+                rule_filter="none",
                 ml_config={
                     'sizing_mode': SizingMode.RISK_PCT if sizing == "risk" else SizingMode.FIXED,
                     'contracts': contracts,
-                    'risk_pct': risk_pct
+                    'risk_pct': risk_pct,
+                    'slippage_ticks': slippage_ticks
                 }
             )
             
@@ -238,7 +246,8 @@ def run_dual(
                 out_dir=run_dir / "orb_temp",
                 from_date=start_date,
                 to_date=end_date,
-                strategy="orb"
+                strategy="orb",
+                slippage_ticks=slippage_ticks
             )
             
             # Consolidate ORB trades
@@ -247,24 +256,44 @@ def run_dual(
             shutil.rmtree(run_dir / "orb_temp")
             pbar.update(1)
         else:
-            print("[INFO] MC-ONLY mode: Skipping backtests and loading existing trades.")
+            print("[INFO] MC-ONLY mode: Searching for historical trade files...")
             source_dir = Path(trades_dir) if trades_dir else Path(".")
             daniel_csv = run_dir / "daniel_trades.csv"
             lg_csv = run_dir / "orb_trades.csv"
             
-            # Copy from source to run_dir
-            if (source_dir / "daniel_trades.csv").exists():
-                shutil.copy(str(source_dir / "daniel_trades.csv"), str(daniel_csv))
-            else:
-                # Create empty if missing
-                with daniel_csv.open("w") as f: f.write("date,direction,entry_price,exit_type,pnl_points,pnl_usd,risk_points\n")
-            
-            if (source_dir / "orb_trades.csv").exists():
-                shutil.copy(str(source_dir / "orb_trades.csv"), str(lg_csv))
+            # 1. ORB Trades
+            orb_source = source_dir / "orb_trades.csv"
+            if orb_source.exists():
+                shutil.copy(str(orb_source), str(lg_csv))
+                print(f"  [OK] Loaded ORB trades: {orb_source.name}")
             else:
                 with lg_csv.open("w") as f: f.write("session_date,side,entry_price,exit_category,pnl_points,pnl_usd,risk_points,entry_time_utc\n")
             
-            pbar.update(3) # Skip 3 steps
+            # 2. Daniel Trades (Combine multiple if found)
+            # Match trades.csv, trades2023-2025.csv, daniel_trades.csv, etc.
+            daniel_files = list(source_dir.glob("trades*.csv")) + list(source_dir.glob("daniel_trades*.csv"))
+            # Filter matches (exclude the orb file we just handled)
+            daniel_files = [f for f in daniel_files if f.name != "orb_trades.csv"]
+            # Deduplicate (if both globs catch the same file)
+            daniel_files = sorted(list(set(daniel_files)))
+
+            if daniel_files:
+                print(f"  [OK] Combining {len(daniel_files)} Daniel trade files...")
+                with daniel_csv.open("w", newline="") as out_f:
+                    writer = None
+                    for i, fpath in enumerate(daniel_files):
+                        with fpath.open("r", newline="") as in_f:
+                            reader = csv.DictReader(in_f)
+                            if not writer:
+                                writer = csv.DictWriter(out_f, fieldnames=reader.fieldnames)
+                                writer.writeheader()
+                            for row in reader:
+                                writer.writerow(row)
+                print(f"      Mapped: {', '.join(f.name for f in daniel_files)}")
+            else:
+                with daniel_csv.open("w") as f: f.write("date,direction,entry_price,exit_type,pnl_points,pnl_usd,risk_points\n")
+            
+            pbar.update(3)
 
         # Step 4: Merge & Metrics
         pbar.set_description(f"Step 4/5: {steps[3]}")
@@ -350,6 +379,7 @@ if __name__ == "__main__":
     parser.add_argument("--mc-seed", type=int, default=None, help="Random seed for reproducible MC")
     parser.add_argument("--mc-only", action="store_true", help="Skip backtests and run MC on existing trades.csv files")
     parser.add_argument("--trades-dir", type=str, default=None, help="Directory containing existing daniel_trades.csv and orb_trades.csv")
+    parser.add_argument("--slippage-ticks", type=int, default=1, help="Adverse slippage per side (ticks). Default=1")
     
     args = parser.parse_args()
     
@@ -368,4 +398,5 @@ if __name__ == "__main__":
         mc_seed=args.mc_seed,
         mc_only=args.mc_only,
         trades_dir=args.trades_dir,
+        slippage_ticks=args.slippage_ticks
     )

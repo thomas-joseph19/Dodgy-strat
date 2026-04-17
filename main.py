@@ -128,10 +128,14 @@ def build_rule_filter_context(setup: TradeSetup, rule_filter: str, gamma_context
 def run_backtest(data_path: str, start_date=None, end_date=None, output_root=None, save_charts=False, extract_features=False, ml_config=None, use_ml=False, model_path=None, ml_threshold=0.5, optimized=False, rule_filter="cluster_near", cluster_max_dist=150.67):
 
     # Initialize Gamma Engine (year-level cache: parquet loaded once per year)
-    gamma_engine = SyntheticGammaEngine(
-        options_dir="data/DownloadedOptions/qqq",
-        underlying_path="data/DownloadedOptions/qqq/underlying.parquet"
-    )
+    try:
+        gamma_engine = SyntheticGammaEngine(
+            options_dir="data/DownloadedOptions/qqq",
+            underlying_path="data/DownloadedOptions/qqq/underlying.parquet"
+        )
+    except Exception as e:
+        print(f"Warning: Gamma Engine disabled ({e})")
+        gamma_engine = None
     feature_extractor = FeatureExtractor()
     trade_features = []
 
@@ -146,8 +150,27 @@ def run_backtest(data_path: str, start_date=None, end_date=None, output_root=Non
         else:
             print(f"Warning: Optimized model not found at {actual_path}. Running naked backtest.")
 
-    df = pd.read_parquet(data_path)
-    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    if str(data_path).endswith('.parquet'):
+        df = pd.read_parquet(data_path)
+    else:
+        print(f"Loading CSV data from {data_path}...")
+        # Institutional format: Semicolon delimited, Comma decimal
+        df = pd.read_csv(data_path, sep=';', decimal=',')
+        # Map institutional columns to our internal format
+        col_map = {
+            'Date': 'timestamp',
+            'Open': 'open',
+            'High': 'high',
+            'Low': 'low',
+            'Close': 'close',
+            'Volume': 'volume'
+        }
+        df = df.rename(columns=col_map)
+        
+    # Use specified format for institutional NQ CSV if not parquet
+    dt_format = None if str(data_path).endswith('.parquet') else "%m/%d/%Y %I:%M %p"
+    df['timestamp'] = pd.to_datetime(df['timestamp'], format=dt_format, errors='coerce')
+    df = df.dropna(subset=['timestamp']).reset_index(drop=True)
 
     if start_date:
         df = df[df['timestamp'] >= start_date].reset_index(drop=True)
@@ -242,7 +265,8 @@ def run_backtest(data_path: str, start_date=None, end_date=None, output_root=Non
         save_charts=save_charts,
         sizing_mode=ml_config.get('sizing_mode', SizingMode.FIXED),
         fixed_contracts=ml_config.get('contracts', 1),
-        risk_per_trade_pct=ml_config.get('risk_pct', 0.01)
+        risk_per_trade_pct=ml_config.get('risk_pct', 0.01),
+        slippage_ticks=ml_config.get('slippage_ticks', 0)
     )
     current_equity = config.starting_capital
     current_day      = None

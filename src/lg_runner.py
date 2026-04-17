@@ -59,7 +59,8 @@ def run_lg_backtest(
     out_dir: Path,
     from_date: str = None,
     to_date: str = None,
-    strategy: str = "lg"
+    strategy: str = "lg",
+    slippage_ticks: int = 1,
 ) -> Path:
     """
     Run the LG Model or ORB strategy backtest CLI.
@@ -72,6 +73,7 @@ def run_lg_backtest(
         from_date: Optional YYYY-MM-DD start date
         to_date: Optional YYYY-MM-DD end date
         strategy: "lg" or "orb"
+        slippage_ticks: adverse slippage per side
 
     Returns:
         Path to the generated trades.csv file
@@ -97,6 +99,7 @@ def run_lg_backtest(
             f"--dataset-1m={m1_path.resolve()}",
             f"--from={from_date or '2010-01-01'}",
             f"--to={to_date or '2026-12-31'}",
+            f"--slippage={slippage_ticks * 0.25}",
             "--output-stem=orb"
         ]
     else:
