@@ -38,5 +38,26 @@
 **Depends on:** Phase 14
 **Plans:** 0 plans
 
+### Phase 16: Quantower API Integration & Multi-Strategy Live Bridge
+
+### Wave 1: C# Bridge Foundation (TCP Sidecar)
+- [x] **T16.1: Initialize Quantower Plugin Script** (Zero-dependency TCP)
+- [x] **T16.2: Embed TCP Data/Order Server** (Bi-directional Streaming)
+
+### Wave 2: Strategy Client Integration
+- [x] **T16.5: Python Live Client (Daniel Model)** (`quantower_live.py`)
+- [x] **T16.6: Node.js Live Client (LG/ORB Model)** (`bridge-client.js`)
+- [ ] **T16.3: Implement Daniel Live Runner** (Integration with XGBoost Models)
+- [ ] **T16.4: Implement LG/ORB Live Runner** (Integration with Node signals)
+
+### Wave 3: Execution Logic & Safety
+- [ ] **T16.7: Prop Firm Guard** (Hard-check limits in Bridge)
+- [ ] **T16.8: Live SIM Validation (UAT)**
+
+**Goal:** Research and implement direct connection to Quantower API (no Algo extension) for live execution.
+**Success:** Strategy can execute trades and manage account data directly via Quantower API.
+**Depends on:** Phase 15
+**Plans:** 0 plans
+
 Plans:
-- [ ] TBD (run /gsd-plan-phase 15 to break down)
+- [ ] TBD (run /gsd-plan-phase 16 to break down)
