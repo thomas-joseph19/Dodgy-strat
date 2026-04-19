@@ -25,7 +25,7 @@ class StrategyThresholds:
     max_sweep_body_violation_points: float = 15.0
     sweep_context_max_bars: int = 50
     min_fvg_size_points: float = 1.5
-    min_impulse_body_ratio: float = 0.50
+    min_impulse_body_ratio: float = 0.30
     min_impulse_size_points: float = 2.0
     max_gap_between_series_points: float = 2.0
     min_inversion_body_points: float = 1.0
@@ -33,8 +33,19 @@ class StrategyThresholds:
     min_clearance_to_internal_points: float = 2.0
     min_target_distance_points: float = 15.0
     min_internal_high_clearance: float = 2.0
+    
+    # ATR Scaling (Future Proofing)
+    use_atr_scaling: bool = True
+    atr_period: int = 100
+    atr_min_swing_mult: float = 0.2
+    atr_min_fvg_mult: float = 0.1
+    atr_min_impulse_mult: float = 0.2
+    atr_min_sweep_ext_mult: float = 0.1
+    atr_max_sweep_viol_mult: float = 0.8
+    atr_min_target_mult: float = 3.5
+    
     htf_timeframe: str = "1h"
-    htf_swing_lookback: int = 5
+    htf_swing_lookback: int = 3
 
 THRESHOLDS = StrategyThresholds()
 
