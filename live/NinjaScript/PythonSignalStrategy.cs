@@ -85,16 +85,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         private readonly object  _tcpLock = new object();
 
         // ── Active trade state ───────────────────────────────────────────────
-        // Shared between background reader thread and NT dispatch thread.
-        // Access only under _tradeLock.
-        private readonly object  _tradeLock    = new object();
+        // _activeSignalName/Stop/Target are read+written only on the NT dispatch
+        // thread (inside Dispatcher.InvokeAsync or OnBarUpdate), so no lock needed.
         private string  _activeSignalName = null;   // null = no open trade
         private double  _activeStop       = 0;
         private double  _activeTarget     = 0;
-        private bool    _pendingClose     = false;
-
-        // A pending SIGNAL received on the reader thread but not yet executed
-        private PendingSignal _pendingSignal = null;
 
         // ── NinjaScript lifecycle ─────────────────────────────────────────────
 
@@ -167,40 +162,20 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (State != State.Realtime)
                 return;
 
-            // ── 1. Execute any pending signal from the reader thread ──────────
-            PendingSignal sig = null;
-            bool doClose = false;
-            lock (_tradeLock)
-            {
-                if (_pendingSignal != null)
-                {
-                    sig            = _pendingSignal;
-                    _pendingSignal = null;
-                }
-                if (_pendingClose)
-                {
-                    doClose       = true;
-                    _pendingClose = false;
-                }
-            }
+            // Signals and closes arrive via Dispatcher.InvokeAsync from the reader
+            // thread and execute immediately — nothing to dequeue here.
 
-            if (doClose)
-                FlattenPosition();
-
-            if (sig != null)
-                ExecuteSignal(sig);
-
-            // ── 2. Re-apply SL/TP every bar while a position is open ──────────
+            // ── Re-apply SL/TP every bar while a position is open ────────────
             // This is required by the Managed approach — NT needs to see these
             // called each bar to keep the bracket orders active.
-            lock (_tradeLock)
+            // All access to _activeSignalName is on the NT dispatch thread — no lock needed.
+            if (_activeSignalName != null && Position.MarketPosition != MarketPosition.Flat)
             {
-                if (_activeSignalName != null && Position.MarketPosition != MarketPosition.Flat)
-                {
-                    SetStopLoss(_activeSignalName,   CalculationMode.Price, _activeStop,   false);
-                    SetProfitTarget(_activeSignalName, CalculationMode.Price, _activeTarget);
-                }
+                SetStopLoss(_activeSignalName,   CalculationMode.Price, _activeStop,   false);
+                SetProfitTarget(_activeSignalName, CalculationMode.Price, _activeTarget);
+            }
 
+            {
                 // If the position closed on the exchange side, clear our tracking state
                 if (_activeSignalName != null && Position.MarketPosition == MarketPosition.Flat)
                 {
@@ -212,7 +187,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             SendBarToPython();
         }
 
-        // ── Order execution ───────────────────────────────────────────────────
+        // ── Order execution (always called on NT dispatch thread) ────────────
 
         private void ExecuteSignal(PendingSignal sig)
         {
@@ -226,12 +201,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             Print(string.Format("[PythonSignal] {0} {1}  entry={2}  stop={3}  target={4}  qty={5}",
                 sig.Action, sig.Id, sig.Entry, sig.Stop, sig.Target, sig.Qty));
 
-            lock (_tradeLock)
-            {
-                _activeSignalName = sig.Id;
-                _activeStop       = sig.Stop;
-                _activeTarget     = sig.Target;
-            }
+            _activeSignalName = sig.Id;
+            _activeStop       = sig.Stop;
+            _activeTarget     = sig.Target;
 
             // Set bracket prices BEFORE submitting entry (required by managed approach)
             SetStopLoss(sig.Id,   CalculationMode.Price, sig.Stop,   false);
@@ -256,10 +228,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ExitShort();
             }
 
-            lock (_tradeLock)
-            {
-                _activeSignalName = null;
-            }
+            _activeSignalName = null;
         }
 
         // ── TCP: connect ──────────────────────────────────────────────────────
@@ -312,7 +281,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     line = line.Trim();
                     if (string.IsNullOrEmpty(line)) continue;
 
-                    ParseAndQueueMessage(line);
+                    ParseAndDispatchMessage(line);
                 }
             }
             catch (Exception ex)
@@ -323,7 +292,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             Print("[PythonSignal] Reader thread exited.");
         }
 
-        private void ParseAndQueueMessage(string json)
+        private void ParseAndDispatchMessage(string json)
         {
             // Simple manual JSON parsing — avoids needing Newtonsoft.Json DLL.
             // Messages are flat single-level objects so this is safe.
@@ -347,17 +316,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return;
                 }
 
-                lock (_tradeLock)
-                    _pendingSignal = sig;
-
-                Print("[PythonSignal] Queued SIGNAL: " + sig.Action + " " + sig.Id);
+                // Marshal order submission onto NT's dispatch thread immediately —
+                // do NOT wait for the next OnBarUpdate (that adds up to 60s delay).
+                Dispatcher.InvokeAsync(() => ExecuteSignal(sig));
+                Print("[PythonSignal] Dispatching SIGNAL: " + sig.Action + " " + sig.Id);
             }
             else if (type == "CLOSE")
             {
-                lock (_tradeLock)
-                    _pendingClose = true;
-
-                Print("[PythonSignal] Queued CLOSE");
+                Dispatcher.InvokeAsync(() => FlattenPosition());
+                Print("[PythonSignal] Dispatching CLOSE");
             }
             else
             {
