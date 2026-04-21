@@ -50,3 +50,15 @@
 - [x] **T18.2: Python Live Engine** (`live/engine.py`)
 - [x] **T18.3: Rithmic Data Feed Integration** (`live/rithmic_bridge.py`)
 - [x] **T18.4: Environment Setup & Setup Guide** (`.env` & `SETUP.md`)
+
+### Phase 19: Prop Firm Safety Guard [NEXT]
+- **Goal:** Implement daily loss limit enforcement in the NinjaTrader bridge to prevent MFFU account termination.
+- **Success:** Bridge refuses new signals once cumulative daily P&L exceeds configurable `MAX_DAILY_LOSS` threshold.
+- **Requirements:** REQ-SAFETY-01
+- **Gap Closure:** Closes critical safety gap from v2.0 audit.
+
+### Phase 20: Quantower Cleanup & Planning Docs Refresh
+- **Goal:** Remove orphaned Quantower bridge code and update stale planning documentation to reflect the NinjaTrader pivot.
+- **Success:** No Quantower references remain in active code; STATE.md, ROADMAP, and phase plans accurately reflect current architecture.
+- **Requirements:** REQ-LIVE-01
+- **Gap Closure:** Closes integration gaps and tech debt from v2.0 audit.
