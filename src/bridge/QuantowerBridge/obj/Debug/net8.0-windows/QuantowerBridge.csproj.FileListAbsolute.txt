@@ -1,6 +1,0 @@
-C:\Users\thoma\Trading\Strategies\Dodgy strat\src\bridge\QuantowerBridge\obj\Debug\net8.0-windows\QuantowerBridge.csproj.AssemblyReference.cache
-C:\Users\thoma\Trading\Strategies\Dodgy strat\src\bridge\QuantowerBridge\obj\Debug\net8.0-windows\QuantowerBridge.GeneratedMSBuildEditorConfig.editorconfig
-C:\Users\thoma\Trading\Strategies\Dodgy strat\src\bridge\QuantowerBridge\obj\Debug\net8.0-windows\QuantowerBridge.AssemblyInfoInputs.cache
-C:\Users\thoma\Trading\Strategies\Dodgy strat\src\bridge\QuantowerBridge\obj\Debug\net8.0-windows\QuantowerBridge.AssemblyInfo.cs
-C:\Users\thoma\Trading\Strategies\Dodgy strat\src\bridge\QuantowerBridge\obj\Debug\net8.0-windows\QuantowerBridge.csproj.CoreCompileInputs.cache
-C:\Users\thoma\Trading\Strategies\Dodgy strat\src\bridge\QuantowerBridge\obj\Debug\net8.0-windows\QuantowerBridge.sourcelink.json

@@ -13,9 +13,9 @@
 - [x] Output backtesting metrics (Net profit, win rate, Sharpe, Sortino ratios).
 - [x] Generate Plotly HTML charts for each individual trade setup for deep inspection.
 
-## Active (v2.0 — Live Trading)
-- [ ] **REQ-SAFETY-01:** Implement daily loss limit guard in live bridge — refuse new signals when cumulative P&L exceeds MAX_DAILY_LOSS. *(Phase 19)*
-- [ ] **REQ-LIVE-01:** Remove orphaned Quantower bridge code and migrate `daniel_mechanical_runner.py` references to NinjaTrader path. *(Phase 20)*
+## Validated (v2.0 — Live Trading)
+- [x] **REQ-SAFETY-01:** Implement daily loss limit guard in live bridge — refuse new signals when cumulative P&L exceeds MAX_DAILY_LOSS. *(Phase 19)*
+- [x] **REQ-LIVE-01:** Remove orphaned Quantower bridge code and migrate `daniel_mechanical_runner.py` references to NinjaTrader path. *(Phase 20)*
 
 ## Deferred
 - REQ-LIVE-02: Node.js ORB live runner — deferred because ORB runs through Python engine via NinjaTrader bridge.
@@ -27,6 +27,6 @@
 
 | REQ-ID | Description | Phase | Status |
 |--------|-------------|-------|--------|
-| REQ-SAFETY-01 | Prop Firm daily loss guard | 19 | Pending |
-| REQ-LIVE-01 | Quantower cleanup & runner migration | 20 | Pending |
+| REQ-SAFETY-01 | Prop Firm daily loss guard | 19 | ✅ Complete |
+| REQ-LIVE-01 | Quantower cleanup & runner migration | 20 | ✅ Complete |
 | REQ-LIVE-02 | Node.js ORB live runner | — | Deferred |

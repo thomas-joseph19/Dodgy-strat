@@ -1,42 +1,44 @@
 # Phase 17 Plan: Mechanical Live Strategy Integration
 
 ## Goal
-Implement the core trading logic ("The Brain") for both the Daniel and ORB strategies in a live execution environment using the Quantower TCP Bridge. This version is **strictly mechanical**, bypassing the XGBoost/ML filters as requested.
+Implement the core trading logic ("The Brain") for both the Daniel and ORB strategies in a live execution environment using the **NinjaTrader TCP Bridge** (`live/ninja_bridge.py`). This version is **strictly mechanical**, bypassing the XGBoost/ML filters.
 
 ## Architecture
-The live runner will use an async event loop:
-1.  **Ingest**: Receive `QUOTE` updates from `127.0.0.1:8081`.
-2.  **State**: Update local price buffers (OHLC construction from ticks).
-3.  **Signal**: Check mechanical conditions (e.g., HTF Sweep + LTF FVG).
-4.  **Action**: Dispatch `ORDER_SEND` commands to the Bridge.
+The live runner uses an async event loop via `NinjaBridge`:
+1.  **Ingest**: Receive BAR JSON updates from NinjaTrader via TCP on `127.0.0.1:6789`.
+2.  **State**: Update local price buffers (OHLC construction from bars).
+3.  **Signal**: Check mechanical conditions via `OrbProcessor` and `DodgyProcessor`.
+4.  **Action**: Dispatch SIGNAL JSON commands back to NinjaTrader for order execution.
 
 ---
 
 ## Tasks
 
-### Wave 1: Daniel Mechanical Engine
-- [/] **T17.1: Port Mechanical Logic to Live Emitter**
-  - Create `src/live/daniel_mechanical_runner.py`.
-  - Implement real-time FVG detection (1min timeframe).
-  - Implement HTF level monitoring (1hr Liquidity Sweeps).
-  - Logic: IF price sweeps 1H level AND 1min FVG forms, THEN Send Market Order.
+### Wave 1: Daniel Mechanical Engine [DONE]
+- [x] **T17.1: Port Mechanical Logic to Live Emitter**
+  - Created `live/dodgy_processor.py`.
+  - Implements real-time FVG detection (1min timeframe).
+  - Implements HTF level monitoring (1hr Liquidity Sweeps).
+  - Logic: IF price sweeps 1H level AND 1min FVG forms, THEN emit Signal.
 
-### Wave 2: ORB Mechanical Engine
-- [/] **T17.2: Implement Live Opening Range Breakout**
-  - Create `strategies/lg_model/src/live/orb_live_runner.js`.
-  - Monitor NY Open (9:30 AM EST).
-  - Capture High/Low at 10:00 AM EST.
-  - Logic: IF price breaks High, THEN Buy Market; IF price breaks Low, THEN Sell Market.
+### Wave 2: ORB Mechanical Engine [DONE]
+- [x] **T17.2: Implement Live Opening Range Breakout**
+  - Created `live/orb_processor.py`.
+  - Monitors NY Open zone (8:00-8:10 AM ET).
+  - Captures bias from 9:30 AM, limit fill at zone midpoint.
+  - Logic: IF breakout bias established AND retrace to midpoint, THEN emit Signal.
 
-### Wave 3: Safety & Lifecycle
-- [/] **T17.3: Position Tracking & SL/TP Management**
-  - Ensure local runners track state (to avoid over-trading).
-  - Implement hard SL/TP attachment to order requests.
+### Wave 3: Safety & Lifecycle [DONE via Phase 19]
+- [x] **T17.3: Position Tracking & SL/TP Management**
+  - `live/engine.py` tracks active trade state with break-even logic.
+  - SL/TP attached to NinjaTrader bracket orders via managed approach.
+- [x] **T17.4: Prop Firm Safety Guard** (moved to Phase 19)
+  - `MAX_DAILY_LOSS` enforcement in `ninja_bridge.py`.
 
 ---
 
 ## Verification Criteria (UAT)
 1.  **Signal Validity**: Python script triggers an order *exactly* when a mechanical setup forms on the chart.
-2.  **Order Execution**: Quantower SIM shows the order with correct Qty and Comment ("Mechanical Entry").
-3.  **Independence**: Daniel (Python) and ORB (Node) can run simultaneously without blocking each other on the TCP port.
+2.  **Order Execution**: NinjaTrader SIM shows the order with correct Qty and bracket (SL/TP).
+3.  **Independence**: ORB and Dodgy signals are processed by the same engine — whichever fires first owns the trade slot.
 4.  **No ML**: Verified that no XGBoost models are loaded or queried during the decision process.
