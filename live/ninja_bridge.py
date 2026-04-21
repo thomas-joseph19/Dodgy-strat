@@ -41,13 +41,16 @@ import logging
 import os
 from datetime import datetime, timezone
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 from src.core import Candle
 from src.execution import Direction
 
-from live.engine import ActiveTrade, LiveEngine, Signal
+from live.engine import ActiveTrade, LiveEngine, Signal, POINT_VALUE
 
 logger = logging.getLogger(__name__)
+
+ET = ZoneInfo("America/New_York")
 
 
 class NinjaBridge(LiveEngine):
@@ -63,6 +66,7 @@ class NinjaBridge(LiveEngine):
         host: str = "127.0.0.1",
         port: int = 6789,
         contracts: int = 1,
+        max_daily_loss: float = -2000.0,
     ) -> None:
         super().__init__(contracts=contracts)
         self._host = host
@@ -70,17 +74,34 @@ class NinjaBridge(LiveEngine):
         self._writer: Optional[asyncio.StreamWriter] = None
         self._last_date: Optional[str] = None
 
+        # ── Prop Firm Safety Guard ─────────────────────────────────────────
+        self._max_daily_loss = max_daily_loss  # negative USD threshold
+        self._daily_pnl_usd: float = 0.0
+        self._daily_pnl_date: Optional[str] = None  # "YYYY-MM-DD" ET
+        self._guard_triggered: bool = False
+
     @classmethod
     def from_env(cls) -> "NinjaBridge":
         return cls(
             host=os.environ.get("NINJA_HOST", "127.0.0.1"),
             port=int(os.environ.get("NINJA_PORT", "6789")),
             contracts=int(os.environ.get("RITHMIC_CONTRACTS", "1")),
+            max_daily_loss=float(os.environ.get("MAX_DAILY_LOSS", "-2000")),
         )
 
     # ── LiveEngine hooks ──────────────────────────────────────────────────────
 
     def on_trade_opened(self, signal: Signal) -> None:
+        # ── Prop Firm Guard gate ───────────────────────────────────────────
+        if self._guard_triggered:
+            logger.critical(
+                "GUARD ACTIVE — Signal SUPPRESSED (%s). Daily P&L: $%.0f (limit: $%.0f)",
+                signal.setup.setup_id, self._daily_pnl_usd, self._max_daily_loss,
+            )
+            # Undo the trade that LiveEngine just opened
+            self._trade = None
+            return
+
         super().on_trade_opened(signal)
         if self._writer:
             asyncio.ensure_future(self._send_signal(signal))
@@ -91,6 +112,22 @@ class NinjaBridge(LiveEngine):
         self, trade: ActiveTrade, exit_category: str, pnl_points: float
     ) -> None:
         super().on_trade_closed(trade, exit_category, pnl_points)
+
+        # ── Prop Firm Guard: accumulate daily P&L ──────────────────────────
+        pnl_usd = pnl_points * POINT_VALUE * trade.contracts
+        self._daily_pnl_usd += pnl_usd
+        logger.info(
+            "Daily P&L updated: $%.0f (trade: $%.0f, limit: $%.0f)",
+            self._daily_pnl_usd, pnl_usd, self._max_daily_loss,
+        )
+        if self._daily_pnl_usd <= self._max_daily_loss:
+            self._guard_triggered = True
+            logger.critical(
+                "🛑 PROP FIRM GUARD TRIGGERED — Daily loss $%.0f exceeds limit $%.0f. "
+                "NO MORE TRADES TODAY.",
+                self._daily_pnl_usd, self._max_daily_loss,
+            )
+
         # Only send CLOSE if exit was detected by our bar logic first.
         # If NT filled the exchange-side SL/TP it will have already closed the
         # position on its side — sending CLOSE is harmless (NT ignores it when flat).
@@ -147,11 +184,21 @@ class NinjaBridge(LiveEngine):
             return
 
         # Day-open GEX refresh (runs in executor so yfinance doesn't block the loop)
-        date_str = ts.strftime("%Y-%m-%d")
-        if date_str != self._last_date:
-            self._last_date = date_str
+        date_et = ts.astimezone(ET).strftime("%Y-%m-%d")
+        if date_et != self._last_date:
+            self._last_date = date_et
+            # ── Prop Firm Guard: reset daily P&L on new trading day ────────
+            if self._daily_pnl_date and self._daily_pnl_date != date_et:
+                logger.info(
+                    "New trading day %s — resetting daily P&L (prev: $%.0f)",
+                    date_et, self._daily_pnl_usd,
+                )
+                self._daily_pnl_usd = 0.0
+                self._guard_triggered = False
+            self._daily_pnl_date = date_et
+
             nq_price = float(msg["close"])
-            logger.info("New trading day %s — fetching GEX (NQ=%.2f)…", date_str, nq_price)
+            logger.info("New trading day %s — fetching GEX (NQ=%.2f)…", date_et, nq_price)
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(None, self.on_day_open, nq_price)
 

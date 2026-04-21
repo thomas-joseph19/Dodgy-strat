@@ -72,9 +72,15 @@ In the `dodgy/` folder, create a file called `.env`:
 NINJA_HOST=127.0.0.1
 NINJA_PORT=6789
 RITHMIC_CONTRACTS=1
+MAX_DAILY_LOSS=-2000
 ```
 
 Keep `RITHMIC_CONTRACTS=1` until you have verified the strategy works correctly.
+
+`MAX_DAILY_LOSS` is the **Prop Firm Safety Guard** — the bridge will refuse all
+new signals once your daily realized P&L drops below this threshold (in USD).
+Set this to match your funded account's daily loss limit (MFFU default: -$2,000
+for most eval accounts).  The guard resets automatically at midnight ET.
 
 ---
 
