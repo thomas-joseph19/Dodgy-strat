@@ -6,3 +6,4 @@ fastparquet
 yfinance
 async-rithmic
 tqdm
+python-dotenv

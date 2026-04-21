@@ -38,26 +38,15 @@
 **Depends on:** Phase 14
 **Plans:** 0 plans
 
-### Phase 16: Quantower API Integration & Multi-Strategy Live Bridge
+### Phase 16: Quantower API Integration & Multi-Strategy Live Bridge [SHELVED]
+**Reason:** Pivoted to NinjaTrader Bridge for better stability and execution speed.
 
-### Wave 1: C# Bridge Foundation (TCP Sidecar)
-- [x] **T16.1: Initialize Quantower Plugin Script** (Zero-dependency TCP)
-- [x] **T16.2: Embed TCP Data/Order Server** (Bi-directional Streaming)
+### Phase 17: Multi-Strategy Live Integration (Mechanical) [IN PROGRESS]
+- **Goal:** Port Daniel and ORB logic to live runners using Rithmic data and NinjaTrader execution.
+- **Success:** Mechanical signals triggering orders in NinjaTrader SIM.
 
-### Wave 2: Strategy Client Integration
-- [x] **T16.5: Python Live Client (Daniel Model)** (`quantower_live.py`)
-- [x] **T16.6: Node.js Live Client (LG/ORB Model)** (`bridge-client.js`)
-- [ ] **T16.3: Implement Daniel Live Runner** (Integration with XGBoost Models)
-- [ ] **T16.4: Implement LG/ORB Live Runner** (Integration with Node signals)
-
-### Wave 3: Execution Logic & Safety
-- [ ] **T16.7: Prop Firm Guard** (Hard-check limits in Bridge)
-- [ ] **T16.8: Live SIM Validation (UAT)**
-
-**Goal:** Research and implement direct connection to Quantower API (no Algo extension) for live execution.
-**Success:** Strategy can execute trades and manage account data directly via Quantower API.
-**Depends on:** Phase 15
-**Plans:** 0 plans
-
-Plans:
-- [ ] TBD (run /gsd-plan-phase 16 to break down)
+### Phase 18: NinjaTrader Live Bridge Implementation [COMPLETED]
+- [x] **T18.1: NinjaScript Python Bridge Strategy** (`PythonSignalStrategy.cs`)
+- [x] **T18.2: Python Live Engine** (`live/engine.py`)
+- [x] **T18.3: Rithmic Data Feed Integration** (`live/rithmic_bridge.py`)
+- [x] **T18.4: Environment Setup & Setup Guide** (`.env` & `SETUP.md`)
