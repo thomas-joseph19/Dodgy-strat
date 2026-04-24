@@ -57,15 +57,18 @@
 
 #region Using declarations
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using System.Windows.Media;
 using NinjaTrader.Cbi;
 using NinjaTrader.Gui.Tools;
 using NinjaTrader.NinjaScript;
+using NinjaTrader.NinjaScript.DrawingTools;
 using NinjaTrader.NinjaScript.Strategies;
 #endregion
 
@@ -92,6 +95,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         private string  _activeSignalName = null;   // null = no open trade
         private double  _activeStop       = 0;
         private double  _activeTarget     = 0;
+
+        // ── Trade visualization state ────────────────────────────────────────
+        private int     _tradeCount       = 0;
+        private int     _entryBar         = 0;
+        private double  _entryPrice       = 0;
+        private string  _entryAction      = "";
 
         // ── NinjaScript lifecycle ─────────────────────────────────────────────
 
@@ -215,6 +224,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EnterLongLimit(0, true, sig.Qty, sig.Entry, sig.Id);
             else
                 EnterShortLimit(0, true, sig.Qty, sig.Entry, sig.Id);
+
+            // Store for visualization (drawn on fill via OnExecutionUpdate)
+            _entryAction = sig.Action;
         }
 
         private void FlattenPosition()
@@ -231,6 +243,118 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             _activeSignalName = null;
+        }
+
+        // ── Trade fill / exit visualization ────────────────────────────────────
+
+        protected override void OnExecutionUpdate(Execution execution,
+            string executionId, double price, int quantity,
+            MarketPosition marketPosition, string orderId, DateTime time)
+        {
+            if (execution.Order == null) return;
+
+            string orderName = execution.Order.Name;
+
+            // ── ENTRY FILL ────────────────────────────────────────────────────
+            if (orderName == _activeSignalName
+                && (execution.Order.OrderAction == OrderAction.Buy
+                    || execution.Order.OrderAction == OrderAction.SellShort))
+            {
+                _tradeCount++;
+                _entryBar   = CurrentBar;
+                _entryPrice = price;
+
+                bool isLong = execution.Order.OrderAction == OrderAction.Buy;
+                string tag   = "trade" + _tradeCount;
+
+                // Entry arrow
+                if (isLong)
+                    Draw.ArrowUp(this, tag + "_entry", false, 0, price - 2 * TickSize, Brushes.DodgerBlue);
+                else
+                    Draw.ArrowDown(this, tag + "_entry", false, 0, price + 2 * TickSize, Brushes.OrangeRed);
+
+                // Entry text label
+                Draw.Text(this, tag + "_entryTxt", false,
+                    string.Format("{0} @ {1:F2}", isLong ? "LONG" : "SHORT", price),
+                    0, price, isLong ? -20 : 20,
+                    isLong ? Brushes.DodgerBlue : Brushes.OrangeRed,
+                    new Gui.Tools.SimpleFont("Arial", 9),
+                    Brushes.Transparent, Brushes.Transparent, 0);
+
+                // Stop-Loss line (red dashed)
+                Draw.HorizontalLine(this, tag + "_sl", _activeStop, Brushes.Red, DashStyleHelper.Dash, 1);
+                Draw.Text(this, tag + "_slTxt", false,
+                    string.Format("SL {0:F2}", _activeStop),
+                    0, _activeStop, isLong ? 15 : -15,
+                    Brushes.Red,
+                    new Gui.Tools.SimpleFont("Arial", 8),
+                    Brushes.Transparent, Brushes.Transparent, 0);
+
+                // Take-Profit line (green dashed)
+                Draw.HorizontalLine(this, tag + "_tp", _activeTarget, Brushes.LimeGreen, DashStyleHelper.Dash, 1);
+                Draw.Text(this, tag + "_tpTxt", false,
+                    string.Format("TP {0:F2}", _activeTarget),
+                    0, _activeTarget, isLong ? -15 : 15,
+                    Brushes.LimeGreen,
+                    new Gui.Tools.SimpleFont("Arial", 8),
+                    Brushes.Transparent, Brushes.Transparent, 0);
+
+                // Entry horizontal line (blue thin)
+                Draw.HorizontalLine(this, tag + "_entryLine", price, Brushes.DodgerBlue, DashStyleHelper.Dot, 1);
+            }
+
+            // ── EXIT FILL (SL, TP, or market close) ───────────────────────────
+            if (execution.Order.OrderAction == OrderAction.Sell
+                || execution.Order.OrderAction == OrderAction.BuyToCover)
+            {
+                if (_tradeCount > 0 && marketPosition == MarketPosition.Flat)
+                {
+                    string tag  = "trade" + _tradeCount;
+                    bool isWin  = (price > _entryPrice && _entryAction == "LONG")
+                              || (price < _entryPrice && _entryAction == "SHORT");
+
+                    // Exit marker
+                    Draw.Diamond(this, tag + "_exit", false, 0, price,
+                        isWin ? Brushes.LimeGreen : Brushes.Red);
+
+                    // Exit text
+                    double pnlPts = _entryAction == "LONG"
+                        ? price - _entryPrice
+                        : _entryPrice - price;
+                    Draw.Text(this, tag + "_exitTxt", false,
+                        string.Format("Exit {0:F2} ({1}{2:F1}pts)",
+                            price, pnlPts >= 0 ? "+" : "", pnlPts),
+                        0, price, isWin ? -20 : 20,
+                        isWin ? Brushes.LimeGreen : Brushes.Red,
+                        new Gui.Tools.SimpleFont("Arial", 9),
+                        Brushes.Transparent, Brushes.Transparent, 0);
+
+                    // Remove the global SL/TP/Entry horizontal lines (they span the entire chart)
+                    RemoveDrawObject(tag + "_sl");
+                    RemoveDrawObject(tag + "_tp");
+                    RemoveDrawObject(tag + "_entryLine");
+
+                    // Draw bounded SL/TP lines only within the trade's bar range
+                    int barsInTrade = CurrentBar - _entryBar;
+                    if (barsInTrade < 1) barsInTrade = 1;
+
+                    Draw.Line(this, tag + "_slRange", false,
+                        barsInTrade, _activeStop, 0, _activeStop,
+                        Brushes.Red, DashStyleHelper.Dash, 1);
+                    Draw.Line(this, tag + "_tpRange", false,
+                        barsInTrade, _activeTarget, 0, _activeTarget,
+                        Brushes.LimeGreen, DashStyleHelper.Dash, 1);
+                    Draw.Line(this, tag + "_entryRange", false,
+                        barsInTrade, _entryPrice, 0, _entryPrice,
+                        Brushes.DodgerBlue, DashStyleHelper.Dot, 1);
+
+                    // Connecting line from entry to exit
+                    Draw.Line(this, tag + "_connector", false,
+                        barsInTrade, _entryPrice, 0, price,
+                        isWin ? Brushes.LimeGreen : Brushes.Red,
+                        DashStyleHelper.Solid, 2);
+                }
+            }
         }
 
         // ── TCP: connect ──────────────────────────────────────────────────────
