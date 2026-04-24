@@ -66,6 +66,7 @@ using System.Text;
 using System.Threading;
 using System.Windows.Media;
 using NinjaTrader.Cbi;
+using NinjaTrader.Gui;
 using NinjaTrader.Gui.Tools;
 using NinjaTrader.NinjaScript;
 using NinjaTrader.NinjaScript.DrawingTools;
@@ -274,30 +275,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Draw.ArrowDown(this, tag + "_entry", false, 0, price + 2 * TickSize, Brushes.OrangeRed);
 
                 // Entry text label
-                Draw.Text(this, tag + "_entryTxt", false,
+                Draw.Text(this, tag + "_entryTxt",
                     string.Format("{0} @ {1:F2}", isLong ? "LONG" : "SHORT", price),
-                    0, price, isLong ? -20 : 20,
-                    isLong ? Brushes.DodgerBlue : Brushes.OrangeRed,
-                    new Gui.Tools.SimpleFont("Arial", 9),
-                    Brushes.Transparent, Brushes.Transparent, 0);
+                    0, isLong ? price + 4 * TickSize : price - 4 * TickSize,
+                    isLong ? Brushes.DodgerBlue : Brushes.OrangeRed);
 
                 // Stop-Loss line (red dashed)
                 Draw.HorizontalLine(this, tag + "_sl", _activeStop, Brushes.Red, DashStyleHelper.Dash, 1);
-                Draw.Text(this, tag + "_slTxt", false,
+                Draw.Text(this, tag + "_slTxt",
                     string.Format("SL {0:F2}", _activeStop),
-                    0, _activeStop, isLong ? 15 : -15,
-                    Brushes.Red,
-                    new Gui.Tools.SimpleFont("Arial", 8),
-                    Brushes.Transparent, Brushes.Transparent, 0);
+                    0, _activeStop, Brushes.Red);
 
                 // Take-Profit line (green dashed)
                 Draw.HorizontalLine(this, tag + "_tp", _activeTarget, Brushes.LimeGreen, DashStyleHelper.Dash, 1);
-                Draw.Text(this, tag + "_tpTxt", false,
+                Draw.Text(this, tag + "_tpTxt",
                     string.Format("TP {0:F2}", _activeTarget),
-                    0, _activeTarget, isLong ? -15 : 15,
-                    Brushes.LimeGreen,
-                    new Gui.Tools.SimpleFont("Arial", 8),
-                    Brushes.Transparent, Brushes.Transparent, 0);
+                    0, _activeTarget, Brushes.LimeGreen);
 
                 // Entry horizontal line (blue thin)
                 Draw.HorizontalLine(this, tag + "_entryLine", price, Brushes.DodgerBlue, DashStyleHelper.Dot, 1);
@@ -321,13 +314,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     double pnlPts = _entryAction == "LONG"
                         ? price - _entryPrice
                         : _entryPrice - price;
-                    Draw.Text(this, tag + "_exitTxt", false,
+                    Draw.Text(this, tag + "_exitTxt",
                         string.Format("Exit {0:F2} ({1}{2:F1}pts)",
                             price, pnlPts >= 0 ? "+" : "", pnlPts),
-                        0, price, isWin ? -20 : 20,
-                        isWin ? Brushes.LimeGreen : Brushes.Red,
-                        new Gui.Tools.SimpleFont("Arial", 9),
-                        Brushes.Transparent, Brushes.Transparent, 0);
+                        0, price, isWin ? Brushes.LimeGreen : Brushes.Red);
 
                     // Remove the global SL/TP/Entry horizontal lines (they span the entire chart)
                     RemoveDrawObject(tag + "_sl");
