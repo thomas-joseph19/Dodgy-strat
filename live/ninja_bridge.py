@@ -147,7 +147,7 @@ class NinjaBridge(LiveEngine):
         if self._writer is None:
             return
         try:
-            self._writer.write((json.dumps(msg) + "\n").encode())
+            self._writer.write((json.dumps(msg, separators=(",", ":")) + "\n").encode())
             await self._writer.drain()
         except Exception as exc:
             logger.error("Send failed: %s", exc)
