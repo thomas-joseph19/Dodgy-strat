@@ -35,15 +35,15 @@ ET = ZoneInfo("America/New_York")
 ZONE_START_H, ZONE_START_M = 8, 0       # 08:00 ET — zone opens
 ZONE_BARS                  = 10         # 10 one-minute bars → zone closes at 08:10
 BIAS_EARLIEST_H, BIAS_EARLIEST_M = 9, 30  # don't check bias before 09:30 ET
-TRADE_WINDOW_H, TRADE_WINDOW_M   = 8, 10  # limit orders active from 08:10 ET
+TRADE_WINDOW_H, TRADE_WINDOW_M   = 9, 0   # limit orders active from 09:00 ET
 CUTOFF_H, CUTOFF_M               = 11, 0  # no new entries after 11:00 ET
 EOD_FLATTEN_H, EOD_FLATTEN_M     = 16, 15 # force-close by 16:15 ET
 
-RR_MULTIPLIER  = 4.0
+RR_MULTIPLIER  = 3.0
 SL_SCAN_LOW    = 5.0
 SL_SCAN_HIGH   = 10.0
 SL_DEFAULT     = 8.0
-MAX_ZONE_WIDTH = 20.0
+MAX_ZONE_WIDTH = 30.0
 MIN_ZONE_WIDTH = 2.0
 
 TICK = 0.25
@@ -133,9 +133,13 @@ class OrbProcessor:
             if d.zone_bars >= ZONE_BARS:
                 zone_width = _round_tick(d.zone_high - d.zone_low)
                 if zone_width < MIN_ZONE_WIDTH or zone_width > MAX_ZONE_WIDTH:
+                    import logging
+                    logging.getLogger(__name__).info("ORB Day skipped — zone width %.2f not in [%.2f, %.2f]", zone_width, MIN_ZONE_WIDTH, MAX_ZONE_WIDTH)
                     d.phase = _Phase.DONE
                 else:
                     d.zone_mid = _round_tick((d.zone_high + d.zone_low) / 2.0)
+                    import logging
+                    logging.getLogger(__name__).info("ORB Zone locked: H=%.2f L=%.2f Mid=%.2f Width=%.2f", d.zone_high, d.zone_low, d.zone_mid, zone_width)
                     d.phase = _Phase.ZONE_LOCKED
             return None
 
