@@ -99,10 +99,19 @@ def fetch_gex_profile(nq_price: float, date_str: Optional[str] = None) -> Option
             for df, is_call in [(chain.calls, True), (chain.puts, False)]:
                 if df.empty:
                     continue
-                df = df[["strike", "gamma", "openInterest"]].dropna()
-                df = df[(df["gamma"] > 0) & (df["openInterest"] > 0)]
+                # yfinance may not include 'gamma' — use it if present,
+                # otherwise approximate from impliedVolatility as a proxy
+                if "gamma" in df.columns:
+                    gamma_col = "gamma"
+                elif "impliedVolatility" in df.columns:
+                    gamma_col = "impliedVolatility"
+                else:
+                    continue  # skip — no usable gamma data
+                needed = ["strike", gamma_col, "openInterest"]
+                df = df[needed].dropna()
+                df = df[(df[gamma_col] > 0) & (df["openInterest"] > 0)]
                 all_strikes.extend(df["strike"].tolist())
-                all_gammas.extend(df["gamma"].tolist())
+                all_gammas.extend(df[gamma_col].tolist())
                 all_ois.extend(df["openInterest"].tolist())
                 all_is_call.extend([is_call] * len(df))
 
