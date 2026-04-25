@@ -172,6 +172,7 @@ class NinjaBridge(LiveEngine):
     # ── Bar / day processing ──────────────────────────────────────────────────
 
     async def _process_message(self, raw: str) -> None:
+        raw = raw.lstrip("\ufeff")  # strip UTF-8 BOM from C# StreamWriter
         try:
             msg = json.loads(raw)
         except json.JSONDecodeError:
