@@ -196,6 +196,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             // ── 3. Send this completed bar to Python ──────────────────────────
+            Print(string.Format("[PythonSignal] BAR {0}  C={1:F2}  Pos={2}",
+                Time[0].ToString("HH:mm"), Close[0], Position.MarketPosition));
             SendBarToPython();
         }
 
@@ -268,6 +270,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 bool isLong = execution.Order.OrderAction == OrderAction.Buy;
                 string tag   = "trade" + _tradeCount;
 
+                Print(string.Format("[PythonSignal] ENTRY FILL #{0}: {1} @ {2:F2}  SL={3:F2}  TP={4:F2} — Drawing markers",
+                    _tradeCount, isLong ? "LONG" : "SHORT", price, _activeStop, _activeTarget));
+
                 // Entry arrow
                 if (isLong)
                     Draw.ArrowUp(this, tag + "_entry", false, 0, price - 2 * TickSize, Brushes.DodgerBlue);
@@ -306,14 +311,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                     bool isWin  = (price > _entryPrice && _entryAction == "LONG")
                               || (price < _entryPrice && _entryAction == "SHORT");
 
+                    double pnlPts = _entryAction == "LONG"
+                        ? price - _entryPrice
+                        : _entryPrice - price;
+
+                    Print(string.Format("[PythonSignal] EXIT FILL #{0}: {1} @ {2:F2}  P&L={3:F1}pts — Drawing exit markers",
+                        _tradeCount, isWin ? "WIN" : "LOSS", price, pnlPts));
+
                     // Exit marker
                     Draw.Diamond(this, tag + "_exit", false, 0, price,
                         isWin ? Brushes.LimeGreen : Brushes.Red);
 
                     // Exit text
-                    double pnlPts = _entryAction == "LONG"
-                        ? price - _entryPrice
-                        : _entryPrice - price;
                     Draw.Text(this, tag + "_exitTxt",
                         string.Format("Exit {0:F2} ({1}{2:F1}pts)",
                             price, pnlPts >= 0 ? "+" : "", pnlPts),
@@ -323,6 +332,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     RemoveDrawObject(tag + "_sl");
                     RemoveDrawObject(tag + "_tp");
                     RemoveDrawObject(tag + "_entryLine");
+                    // Also remove the SL/TP text labels
+                    RemoveDrawObject(tag + "_slTxt");
+                    RemoveDrawObject(tag + "_tpTxt");
 
                     // Draw bounded SL/TP lines only within the trade's bar range
                     int barsInTrade = CurrentBar - _entryBar;

@@ -211,7 +211,21 @@ class NinjaBridge(LiveEngine):
         )
         # on_bar() is synchronous; it calls on_trade_opened/closed internally
         # which schedule async sends via ensure_future
-        self.on_bar(bar)
+        signal = self.on_bar(bar)
+
+        # ── Verbose bar status for PowerShell ─────────────────────────────
+        time_et = ts.astimezone(ET).strftime("%H:%M")
+        status = "FLAT"
+        if self._trade:
+            t = self._trade
+            status = f"IN {t.signal.source} {t.signal.setup.direction.value.upper()} (SL={t.current_stop:.2f})"
+        guard = ""
+        if self._guard_triggered:
+            guard = " | 🛑 GUARD ACTIVE"
+        logger.info(
+            "BAR %s  C=%.2f  | %s | DayP&L=$%.0f%s",
+            time_et, bar.close, status, self._daily_pnl_usd, guard,
+        )
 
     # ── TCP server ────────────────────────────────────────────────────────────
 

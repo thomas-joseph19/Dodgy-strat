@@ -130,19 +130,34 @@ class LiveEngine:
     def on_trade_opened(self, signal: Signal) -> None:
         """Called immediately when a new trade is entered."""
         logger.info(
-            "[%s] ENTER %s @ %.2f  SL=%.2f  TP=%.2f",
+            "\n╔══════════════════════════════════════════════════════╗\n"
+            "║  🔔 NEW TRADE — %s %s                              ║\n"
+            "╠══════════════════════════════════════════════════════╣\n"
+            "║  Entry:  %.2f                                       ║\n"
+            "║  Stop:   %.2f                                       ║\n"
+            "║  Target: %.2f                                       ║\n"
+            "║  ID:     %s                                         ║\n"
+            "╚══════════════════════════════════════════════════════╝",
             signal.source,
             signal.setup.direction.value.upper(),
             signal.setup.entry_price,
             signal.setup.stop_price,
             signal.setup.target_price,
+            signal.setup.setup_id,
         )
 
     def on_trade_closed(self, trade: ActiveTrade, exit_category: str, pnl_points: float) -> None:
         """Called when a trade is closed (stop, target, or EOD)."""
         pnl_usd = pnl_points * POINT_VALUE * trade.contracts
+        win = "✅ WIN" if pnl_usd >= 0 else "❌ LOSS"
         logger.info(
-            "[%s] CLOSE %s  pnl=%.2fpts ($%.0f)  reason=%s",
+            "\n╔══════════════════════════════════════════════════════╗\n"
+            "║  %s — %s %s                                         ║\n"
+            "╠══════════════════════════════════════════════════════╣\n"
+            "║  P&L:    %+.2f pts  ($%+.0f)                        ║\n"
+            "║  Reason: %s                                         ║\n"
+            "╚══════════════════════════════════════════════════════╝",
+            win,
             trade.signal.source,
             trade.signal.setup.direction.value.upper(),
             pnl_points,
