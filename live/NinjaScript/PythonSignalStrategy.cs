@@ -128,11 +128,16 @@ namespace NinjaTrader.NinjaScript.Strategies
             else if (State == State.Configure)
             {
                 // Managed approach: SL and TP are set dynamically per-signal.
-                // We call SetStopLoss/SetProfitTarget in OnBarUpdate before each entry.
+            }
+            else if (State == State.DataLoaded)
+            {
+                // Connect TCP before historical bars start processing
+                ConnectToPython();
             }
             else if (State == State.Realtime)
             {
-                ConnectToPython();
+                // Start async reader thread for real-time mode
+                StartReaderThread();
             }
             else if (State == State.Terminated)
             {
@@ -170,35 +175,35 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         protected override void OnBarUpdate()
         {
-            // Only act on real-time bars
-            if (State != State.Realtime)
-                return;
-
-            // Signals and closes arrive via Dispatcher.InvokeAsync from the reader
-            // thread and execute immediately — nothing to dequeue here.
+            if (_writer == null) return;  // not connected to Python
 
             // ── Re-apply SL/TP every bar while a position is open ────────────
-            // This is required by the Managed approach — NT needs to see these
-            // called each bar to keep the bracket orders active.
-            // All access to _activeSignalName is on the NT dispatch thread — no lock needed.
             if (_activeSignalName != null && Position.MarketPosition != MarketPosition.Flat)
             {
                 SetStopLoss(_activeSignalName,   CalculationMode.Price, _activeStop,   false);
                 SetProfitTarget(_activeSignalName, CalculationMode.Price, _activeTarget);
             }
 
+            // If the position closed on the exchange side, clear our tracking state
+            if (_activeSignalName != null && Position.MarketPosition == MarketPosition.Flat)
             {
-                // If the position closed on the exchange side, clear our tracking state
-                if (_activeSignalName != null && Position.MarketPosition == MarketPosition.Flat)
-                {
-                    _activeSignalName = null;
-                }
+                _activeSignalName = null;
             }
 
-            // ── 3. Send this completed bar to Python ──────────────────────────
-            Print(string.Format("[PythonSignal] BAR {0}  C={1:F2}  Pos={2}",
-                Time[0].ToString("HH:mm"), Close[0], Position.MarketPosition));
+            // Send bar to Python
             SendBarToPython();
+
+            // For historical bars: read Python's response synchronously
+            if (State == State.Historical)
+            {
+                ReadResponsesSync();
+            }
+            else if (State == State.Realtime)
+            {
+                // Real-time: responses arrive via async reader thread
+                Print(string.Format("[PythonSignal] BAR {0}  C={1:F2}  Pos={2}",
+                    Time[0].ToString("HH:mm"), Close[0], Position.MarketPosition));
+            }
         }
 
         // ── Order execution (always called on NT dispatch thread) ────────────
@@ -375,13 +380,59 @@ namespace NinjaTrader.NinjaScript.Strategies
             catch (Exception ex)
             {
                 Print("[PythonSignal] Could not connect to Python: " + ex.Message);
-                Print("[PythonSignal] → Make sure 'python -m live.run_live' is running first.");
+                Print("[PythonSignal] -> Make sure 'python -m live.run_live' is running first.");
                 return;
             }
+        }
 
-            // Start background thread to read incoming messages from Python
+        private void StartReaderThread()
+        {
+            if (_tcp == null || !_tcp.Connected) return;
             _readerThread = new Thread(ReaderLoop) { IsBackground = true, Name = "PythonReader" };
             _readerThread.Start();
+            Print("[PythonSignal] Async reader thread started for real-time mode.");
+        }
+
+        // ── Synchronous response reader (used during Historical bar processing) ──
+
+        private void ReadResponsesSync()
+        {
+            if (_reader == null) return;
+            try
+            {
+                while (true)
+                {
+                    string line = _reader.ReadLine();
+                    if (line == null) break;
+                    line = line.Trim();
+                    if (string.IsNullOrEmpty(line)) continue;
+
+                    string type = ExtractString(line, "type");
+                    if (type == "ACK") break;  // Python done with this bar
+
+                    if (type == "SIGNAL")
+                    {
+                        var sig = new PendingSignal
+                        {
+                            Action = ExtractString(line, "action"),
+                            Entry  = ExtractDouble(line, "entry"),
+                            Stop   = ExtractDouble(line, "stop"),
+                            Target = ExtractDouble(line, "target"),
+                            Qty    = (int)ExtractDouble(line, "qty"),
+                            Id     = ExtractString(line, "id"),
+                        };
+                        ExecuteSignal(sig);
+                    }
+                    else if (type == "CLOSE")
+                    {
+                        FlattenPosition();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Print("[PythonSignal] ReadResponsesSync error: " + ex.Message);
+            }
         }
 
         private void DisconnectFromPython()

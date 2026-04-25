@@ -80,6 +80,9 @@ class NinjaBridge(LiveEngine):
         self._daily_pnl_date: Optional[str] = None  # "YYYY-MM-DD" ET
         self._guard_triggered: bool = False
 
+        # ── Message queue (flushed after each bar for historical support) ──
+        self._pending_sends: list = []
+
     @classmethod
     def from_env(cls) -> "NinjaBridge":
         return cls(
@@ -98,15 +101,22 @@ class NinjaBridge(LiveEngine):
                 "GUARD ACTIVE — Signal SUPPRESSED (%s). Daily P&L: $%.0f (limit: $%.0f)",
                 signal.setup.setup_id, self._daily_pnl_usd, self._max_daily_loss,
             )
-            # Undo the trade that LiveEngine just opened
             self._trade = None
             return
 
         super().on_trade_opened(signal)
-        if self._writer:
-            asyncio.ensure_future(self._send_signal(signal))
-        else:
-            logger.warning("Signal fired but no NinjaTrader connection — order not sent.")
+        # Queue signal — flushed after on_bar() returns
+        setup = signal.setup
+        is_long = setup.direction == Direction.LONG
+        self._pending_sends.append({
+            "type":   "SIGNAL",
+            "action": "LONG" if is_long else "SHORT",
+            "entry":  setup.entry_price,
+            "stop":   setup.stop_price,
+            "target": setup.target_price,
+            "qty":    self._contracts,
+            "id":     setup.setup_id,
+        })
 
     def on_trade_closed(
         self, trade: ActiveTrade, exit_category: str, pnl_points: float
@@ -123,16 +133,13 @@ class NinjaBridge(LiveEngine):
         if self._daily_pnl_usd <= self._max_daily_loss:
             self._guard_triggered = True
             logger.critical(
-                "🛑 PROP FIRM GUARD TRIGGERED — Daily loss $%.0f exceeds limit $%.0f. "
+                "PROP FIRM GUARD TRIGGERED — Daily loss $%.0f exceeds limit $%.0f. "
                 "NO MORE TRADES TODAY.",
                 self._daily_pnl_usd, self._max_daily_loss,
             )
 
-        # Only send CLOSE if exit was detected by our bar logic first.
-        # If NT filled the exchange-side SL/TP it will have already closed the
-        # position on its side — sending CLOSE is harmless (NT ignores it when flat).
-        if self._writer:
-            asyncio.ensure_future(self._send_close())
+        # Queue CLOSE — flushed after on_bar() returns
+        self._pending_sends.append({"type": "CLOSE"})
 
     # ── TCP send helpers ──────────────────────────────────────────────────────
 
@@ -209,11 +216,16 @@ class NinjaBridge(LiveEngine):
             low=float(msg["low"]),
             close=float(msg["close"]),
         )
-        # on_bar() is synchronous; it calls on_trade_opened/closed internally
-        # which schedule async sends via ensure_future
-        signal = self.on_bar(bar)
+        # on_bar() is synchronous; queues messages in _pending_sends
+        self.on_bar(bar)
 
-        # ── Verbose bar status for PowerShell ─────────────────────────────
+        # Flush queued messages, then send ACK so NT can proceed
+        for pending in self._pending_sends:
+            await self._send(pending)
+        self._pending_sends.clear()
+        await self._send({"type": "ACK"})
+
+        # ── Verbose bar status for PowerShell (real-time only) ────────────
         time_et = ts.astimezone(ET).strftime("%H:%M")
         status = "FLAT"
         if self._trade:
@@ -221,7 +233,7 @@ class NinjaBridge(LiveEngine):
             status = f"IN {t.signal.source} {t.signal.setup.direction.value.upper()} (SL={t.current_stop:.2f})"
         guard = ""
         if self._guard_triggered:
-            guard = " | 🛑 GUARD ACTIVE"
+            guard = " | GUARD ACTIVE"
         logger.info(
             "BAR %s  C=%.2f  | %s | DayP&L=$%.0f%s",
             time_et, bar.close, status, self._daily_pnl_usd, guard,
