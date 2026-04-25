@@ -149,15 +149,21 @@ class LiveEngine:
     def on_trade_closed(self, trade: ActiveTrade, exit_category: str, pnl_points: float) -> None:
         """Called when a trade is closed (stop, target, or EOD)."""
         pnl_usd = pnl_points * POINT_VALUE * trade.contracts
-        win = "✅ WIN" if pnl_usd >= 0 else "❌ LOSS"
+        if pnl_usd > 0:
+            result = "✅ WIN"
+        elif pnl_usd < 0:
+            result = "❌ LOSS"
+        else:
+            result = "➖ SCRATCH"
+            
         logger.info(
             "\n╔══════════════════════════════════════════════════════╗\n"
-            "║  %s — %s %s                                         ║\n"
+            "║  %s — %s %s                                      ║\n"
             "╠══════════════════════════════════════════════════════╣\n"
             "║  P&L:    %+.2f pts  ($%+.0f)                        ║\n"
             "║  Reason: %s                                         ║\n"
             "╚══════════════════════════════════════════════════════╝",
-            win,
+            result,
             trade.signal.source,
             trade.signal.setup.direction.value.upper(),
             pnl_points,
