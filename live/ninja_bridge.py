@@ -246,7 +246,15 @@ class NinjaBridge(LiveEngine):
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ) -> None:
         peer = writer.get_extra_info("peername")
-        logger.info("NinjaTrader connected from %s", peer)
+        logger.info("NinjaTrader connected from %s — RESETTING STATE", peer)
+        
+        # Reset internal state so consecutive backtests run correctly
+        self.__init__(
+            host=self._host,
+            port=self._port,
+            contracts=self._contracts,
+            max_daily_loss=self._max_daily_loss,
+        )
         self._writer = writer
 
         try:

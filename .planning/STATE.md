@@ -35,6 +35,7 @@ Phase 19-20: Prop Firm Safety Guard & Quantower Cleanup (Gap Closure from v2.0 A
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
-| 260427-nwe | Fix NinjaTrader not taking trades | 2026-04-27 | pending | [260427-nwe-fix-ninjatrader-not-taking-trades](./quick/260427-nwe-fix-ninjatrader-not-taking-trades/) |
+| 260427-nwe | Fix NinjaTrader not taking trades | 2026-04-27 | e936bc4 | [260427-nwe-fix-ninjatrader-not-taking-trades](./quick/260427-nwe-fix-ninjatrader-not-taking-trades/) |
+| 260427-o5n | Reset LiveEngine state on NT connection | 2026-04-27 | pending | [260427-o5n-reset-liveengine-state-on-nt-connection-](./quick/260427-o5n-reset-liveengine-state-on-nt-connection-/) |
 
-Last activity: 2026-04-27 - Completed quick task 260427-nwe: Fix NinjaTrader not taking trades
+Last activity: 2026-04-27 - Completed quick task 260427-o5n: Reset LiveEngine state on NT connection
