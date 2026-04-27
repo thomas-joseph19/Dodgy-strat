@@ -229,9 +229,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             SetProfitTarget(sig.Id, CalculationMode.Price, sig.Target);
 
             if (sig.Action == "LONG")
-                EnterLongLimit(0, true, sig.Qty, sig.Entry, sig.Id);
+                EnterLong(0, sig.Qty, sig.Id);
             else
-                EnterShortLimit(0, true, sig.Qty, sig.Entry, sig.Id);
+                EnterShort(0, sig.Qty, sig.Id);
 
             // Store for visualization (drawn on fill via OnExecutionUpdate)
             _entryAction = sig.Action;

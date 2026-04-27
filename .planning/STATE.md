@@ -32,3 +32,9 @@ Phase 19-20: Prop Firm Safety Guard & Quantower Cleanup (Gap Closure from v2.0 A
 - Dashboard 🎲 Monte Carlo tab implementation
 - Logic Soundness Audit (Slippage integration, GEX filter fix)
 - NinjaTrader environment setup (.env, requirements.txt, python-dotenv)
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260427-nwe | Fix NinjaTrader not taking trades | 2026-04-27 | pending | [260427-nwe-fix-ninjatrader-not-taking-trades](./quick/260427-nwe-fix-ninjatrader-not-taking-trades/) |
+
+Last activity: 2026-04-27 - Completed quick task 260427-nwe: Fix NinjaTrader not taking trades
